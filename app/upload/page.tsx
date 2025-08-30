@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -32,6 +32,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 
 export default function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([])
+  const [progressIntervals, setProgressIntervals] = useState<Map<string, NodeJS.Timeout>>(new Map())
   const router = useRouter()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -45,12 +46,19 @@ export default function UploadPage() {
     setFiles((prev) => [...prev, ...newFiles])
 
     newFiles.forEach((uploadedFile) => {
-      processFile(uploadedFile.id)
+      // Start progress simulation
+      const progressInterval = simulateProgress(uploadedFile.id)
+      if (progressInterval) {
+        setProgressIntervals(prev => new Map(prev).set(uploadedFile.id, progressInterval))
+      }
+      // Process file after a short delay to show progress
+      setTimeout(() => {
+        processFile(uploadedFile.id, uploadedFile)
+      }, 1000)
     })
   }, [])
 
-  const processFile = async (fileId: string) => {
-    const uploadedFile = files.find((f) => f.id === fileId)
+  const processFile = async (fileId: string, uploadedFile: UploadedFile) => {
     if (!uploadedFile) return
 
     try {
@@ -76,13 +84,21 @@ export default function UploadPage() {
         ),
       )
 
+      // Add a small delay to show processing status
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       // Get OpenAI key from localStorage
       const openaiKey = localStorage.getItem("voiceloop_openai_key")
       if (!openaiKey) {
-        throw new Error("OpenAI API key not configured. Please add it in Settings.")
+        // Mark as completed without AI processing if no key
+        setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: "completed", progress: 100 } : f))
+        return
       }
 
-      // Process file with AI
+      // Process file with AI with timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
       const processResponse = await fetch("/api/process", {
         method: "POST",
         headers: {
@@ -92,7 +108,10 @@ export default function UploadPage() {
           fileId: uploadResult.fileId,
           openaiKey,
         }),
+        signal: controller.signal,
       })
+      
+      clearTimeout(timeoutId)
 
       if (!processResponse.ok) {
         throw new Error("Processing failed")
@@ -102,13 +121,23 @@ export default function UploadPage() {
       setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "completed", progress: 100 } : f)))
     } catch (error) {
       console.error("File processing error:", error)
+      let errorMessage = "Processing failed"
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = "Processing timed out. Please try again."
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
       setFiles((prev) =>
         prev.map((f) =>
           f.id === fileId
             ? {
                 ...f,
                 status: "error",
-                error: error instanceof Error ? error.message : "Processing failed",
+                error: errorMessage,
               }
             : f,
         ),
@@ -119,7 +148,7 @@ export default function UploadPage() {
   const simulateProgress = (fileId: string) => {
     let progress = 0
     const interval = setInterval(() => {
-      progress += Math.random() * 10
+      progress += Math.random() * 15
 
       setFiles((prev) =>
         prev.map((file) => {
@@ -133,11 +162,37 @@ export default function UploadPage() {
           return file
         }),
       )
-    }, 200)
+    }, 150)
+
+    // Store interval reference for cleanup
+    return interval
   }
 
   const removeFile = (fileId: string) => {
+    // Clear progress interval if it exists
+    const interval = progressIntervals.get(fileId)
+    if (interval) {
+      clearInterval(interval)
+      setProgressIntervals(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(fileId)
+        return newMap
+      })
+    }
     setFiles((prev) => prev.filter((file) => file.id !== fileId))
+  }
+
+  const retryFile = (fileId: string) => {
+    const fileToRetry = files.find(f => f.id === fileId)
+    if (fileToRetry) {
+      // Reset status and retry
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { ...f, status: "uploading", progress: 0, error: undefined } : f
+        )
+      )
+      processFile(fileId, fileToRetry)
+    }
   }
 
   const viewResults = (uploadedFile: UploadedFile) => {
@@ -147,10 +202,10 @@ export default function UploadPage() {
   }
 
   const getFileIcon = (file: File) => {
-    if (file.type.includes("pdf")) return <FileText className="h-6 w-6" />
-    if (file.type.includes("audio")) return <Music className="h-6 w-6" />
-    if (file.type.includes("video")) return <Video className="h-6 w-6" />
-    return <File className="h-6 w-6" />
+    if (file.type.includes("pdf")) return <FileText className="h-6 w-6 text-red-500 drop-shadow-sm" />
+    if (file.type.includes("audio")) return <Music className="h-6 w-6 text-blue-500 drop-shadow-sm" />
+    if (file.type.includes("video")) return <Video className="h-6 w-6 text-purple-500 drop-shadow-sm" />
+    return <File className="h-6 w-6 text-primary drop-shadow-sm" />
   }
 
   const getStatusColor = (status: UploadedFile["status"]) => {
@@ -168,6 +223,13 @@ export default function UploadPage() {
     }
   }
 
+  // Cleanup progress intervals when component unmounts
+  useEffect(() => {
+    return () => {
+      progressIntervals.forEach(interval => clearInterval(interval))
+    }
+  }, [progressIntervals])
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: ACCEPTED_FILE_TYPES,
@@ -178,7 +240,7 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-thin border-border/50">
+      <header className="border-b-2 border-primary/20 bg-gradient-to-r from-background to-primary/5">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -188,12 +250,12 @@ export default function UploadPage() {
               </Link>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
+              <Button variant="outline" size="sm" className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md" asChild>
                 <Link href="/settings">Settings</Link>
               </Button>
-              <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
+              <Button variant="outline" size="sm" className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md" asChild>
                 <Link href="/">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  <ArrowLeft className="mr-2 h-4 w-4 text-primary" />
                   Back to Home
                 </Link>
               </Button>
@@ -214,13 +276,13 @@ export default function UploadPage() {
         <Card className="mb-8">
           <div
             {...getRootProps()}
-            className={`p-12 border-2 border-dashed rounded-lg transition-colors cursor-pointer ${
-              isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+            className={`p-12 border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${
+              isDragActive ? "border-primary bg-primary/5 shadow-lg" : "border-primary/30 hover:border-primary/50 bg-gradient-to-br from-background to-primary/5"
             }`}
           >
             <input {...getInputProps()} />
             <div className="text-center">
-              <Upload className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <Upload className="h-16 w-16 text-primary mx-auto mb-4 drop-shadow-lg" />
               {isDragActive ? (
                 <p className="text-lg font-light text-primary">Drop your files here...</p>
               ) : (
@@ -243,7 +305,7 @@ export default function UploadPage() {
             <h2 className="text-2xl font-light text-foreground mb-4">Processing Files ({files.length})</h2>
 
             {files.map((uploadedFile) => (
-              <Card key={uploadedFile.id} className="p-6">
+                             <Card key={uploadedFile.id} className="p-6 border-2 border-primary/20 hover:border-primary/30 transition-colors duration-200 shadow-sm hover:shadow-md">
                 <div className="flex items-center gap-4">
                   <div className="text-muted-foreground">{getFileIcon(uploadedFile.file)}</div>
 
@@ -253,6 +315,11 @@ export default function UploadPage() {
                       <Badge variant="secondary" className="text-xs">
                         {(uploadedFile.file.size / 1024 / 1024).toFixed(1)} MB
                       </Badge>
+                      {uploadedFile.fileId && (
+                        <Badge variant="outline" className="text-xs">
+                          {uploadedFile.file.type.split("/")[1]?.toUpperCase() || "FILE"}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -267,7 +334,9 @@ export default function UploadPage() {
                         {uploadedFile.status === "processing" && (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
-                            <span className="text-sm text-muted-foreground">Processing with AI...</span>
+                            <span className="text-sm text-muted-foreground">
+                              {uploadedFile.fileId ? "Processing with AI..." : "Uploading..."}
+                            </span>
                           </>
                         )}
                         {uploadedFile.status === "completed" && (
@@ -277,7 +346,7 @@ export default function UploadPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="ml-2 font-light bg-transparent"
+                              className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
                               onClick={() => viewResults(uploadedFile)}
                             >
                               View Results
@@ -288,6 +357,14 @@ export default function UploadPage() {
                           <>
                             <AlertCircle className="h-4 w-4 text-red-500" />
                             <span className="text-sm text-red-600">{uploadedFile.error || "Error"}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                              onClick={() => retryFile(uploadedFile.id)}
+                            >
+                              Retry
+                            </Button>
                           </>
                         )}
                       </div>

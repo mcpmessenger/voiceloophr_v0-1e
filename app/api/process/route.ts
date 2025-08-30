@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { AIService } from "@/lib/aiService"
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,34 +17,57 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File not found" }, { status: 404 })
     }
 
-    const buffer = Buffer.from(fileData.buffer, "base64")
-    let extractedText = ""
-    let transcription = ""
-
-    // Process based on file type
-    if (fileData.type === "application/pdf") {
-      // Simulate PDF text extraction
-      extractedText = `[PDF Content from ${fileData.name}]\n\nThis is simulated extracted text from the PDF document. In a real implementation, this would use a PDF parsing library like pdf-parse or pdf2pic to extract actual text content from the uploaded PDF file.`
-    } else if (fileData.type === "text/markdown" || fileData.name.endsWith(".md")) {
-      extractedText = buffer.toString("utf-8")
-    } else if (fileData.type === "text/csv") {
-      extractedText = buffer.toString("utf-8")
-    } else if (fileData.type === "audio/wav" || fileData.type === "video/mp4") {
-      // Simulate Whisper transcription
-      transcription = await transcribeAudio(buffer, openaiKey)
-      extractedText = transcription
+    // Check if file has already been processed
+    if (!fileData.extractedText) {
+      return NextResponse.json({ error: "File has not been processed yet" }, { status: 400 })
     }
 
-    // Generate AI summary
-    const summary = await generateSummary(extractedText, openaiKey)
+    let transcription = ""
+    let summary = ""
+
+    // Handle audio/video transcription if needed
+    if (fileData.type === "audio/wav" || fileData.type === "video/mp4") {
+      try {
+        const buffer = Buffer.from(fileData.buffer, "base64")
+        const transcriptionResult = await AIService.transcribeAudio(buffer, openaiKey, fileData.name)
+        transcription = transcriptionResult.content
+        
+        // Update file data with transcription
+        fileData.transcription = transcription
+        fileData.extractedText = transcription // Use transcription as extracted text for audio/video
+      } catch (transcriptionError) {
+        console.error("Transcription error:", transcriptionError)
+        return NextResponse.json({ 
+          error: "Audio transcription failed", 
+          details: transcriptionError instanceof Error ? transcriptionError.message : "Unknown error"
+        }, { status: 500 })
+      }
+    }
+
+    // Generate AI summary using real OpenAI API
+    try {
+      const summaryResult = await AIService.analyzeDocument(
+        fileData.extractedText, 
+        openaiKey, 
+        'summarize'
+      )
+      summary = summaryResult.content
+    } catch (summaryError) {
+      console.error("Summary generation error:", summaryError)
+      return NextResponse.json({ 
+        error: "AI summary generation failed", 
+        details: summaryError instanceof Error ? summaryError.message : "Unknown error"
+      }, { status: 500 })
+    }
 
     // Store processed results
     const processedData = {
       ...fileData,
-      extractedText,
       transcription,
       summary,
       processedAt: new Date().toISOString(),
+      aiProcessed: true,
+      aiProcessingError: null
     }
 
     global.uploadedFiles.set(fileId, processedData)
@@ -51,96 +75,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       fileId,
-      extractedText: extractedText.substring(0, 500) + (extractedText.length > 500 ? "..." : ""),
+      extractedText: fileData.extractedText.substring(0, 500) + (fileData.extractedText.length > 500 ? "..." : ""),
       summary,
       transcription: transcription ? transcription.substring(0, 200) + (transcription.length > 200 ? "..." : "") : null,
+      wordCount: fileData.wordCount,
+      metadata: fileData.metadata
     })
   } catch (error) {
     console.error("Processing error:", error)
     return NextResponse.json({ error: "Processing failed" }, { status: 500 })
-  }
-}
-
-async function transcribeAudio(buffer: Buffer, openaiKey: string): Promise<string> {
-  try {
-    // In a real implementation, this would call OpenAI Whisper API
-    // For now, simulate transcription
-    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate processing time
-
-    return "This is a simulated transcription of the audio file. In a real implementation, this would use OpenAI's Whisper API to convert speech to text with high accuracy."
-
-    /* Real implementation would be:
-    const formData = new FormData()
-    formData.append('file', new Blob([buffer]), 'audio.wav')
-    formData.append('model', 'whisper-1')
-    
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`
-      },
-      body: formData
-    })
-    
-    const result = await response.json()
-    return result.text
-    */
-  } catch (error) {
-    console.error("Transcription error:", error)
-    return "Transcription failed"
-  }
-}
-
-async function generateSummary(text: string, openaiKey: string): Promise<string> {
-  try {
-    // In a real implementation, this would call OpenAI GPT-4 API
-    // For now, simulate summary generation
-    await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate processing time
-
-    const wordCount = text.split(" ").length
-    return `**Document Summary**
-
-**Key Points:**
-• This document contains approximately ${wordCount} words
-• Main topics include document processing and AI analysis
-• Content has been successfully extracted and analyzed
-
-**Action Items:**
-• Review the extracted content for accuracy
-• Consider implementing voice chat for deeper interaction
-• Use semantic search to find specific information
-
-*This is a simulated summary. In production, this would be generated by GPT-4 based on the actual document content.*`
-
-    /* Real implementation would be:
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert document analyzer. Create concise, actionable summaries with key points and action items.'
-          },
-          {
-            role: 'user',
-            content: `Please summarize this document:\n\n${text}`
-          }
-        ],
-        max_tokens: 500,
-        temperature: 0.3
-      })
-    })
-    
-    const result = await response.json()
-    return result.choices[0].message.content
-    */
-  } catch (error) {
-    console.error("Summary generation error:", error)
-    return "Summary generation failed"
   }
 }
