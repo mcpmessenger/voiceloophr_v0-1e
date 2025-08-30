@@ -1,85 +1,102 @@
 import mammoth from 'mammoth'
 import csv from 'csv-parser'
 import { Readable } from 'stream'
+import { SmartParser, SmartParserResult } from './smartParser'
 
 export interface ProcessedDocument {
   text: string
   wordCount: number
   pages?: number
   metadata?: Record<string, any>
+  // Enhanced fields from Smart Parser
+  contentAnalysis?: any
+  securityScan?: any
+  processingTime?: number
+  capabilities?: string[]
+  hasErrors?: boolean
+  errors?: string[]
+  warnings?: string[]
 }
 
 export class DocumentProcessor {
   /**
-   * Process PDF documents and extract text content
+   * Process PDF documents and extract text content using Smart Parser
    */
   static async processPDF(buffer: Buffer): Promise<ProcessedDocument> {
     try {
-      console.log(`Processing PDF with buffer size: ${buffer.length} bytes`)
+      console.log(`Processing PDF with Smart Parser - buffer size: ${buffer.length} bytes`)
       
       // Check if buffer is valid
       if (!buffer || buffer.length === 0) {
         throw new Error("Invalid buffer: empty or null")
       }
       
-      // For now, provide a placeholder text that acknowledges the PDF upload
-      // This will be enhanced later with proper PDF parsing
-      const placeholderText = `PDF document uploaded successfully (${buffer.length} bytes).
+      // Use Smart Parser for enhanced PDF processing
+      const smartResult = await SmartParser.parseDocument(
+        buffer,
+        'document.pdf',
+        'application/pdf',
+        {
+          enableContentAnalysis: true,
+          enableSecurityScan: true,
+          enableOCR: true
+        }
+      )
       
-This is a PDF document that has been uploaded and stored in the system. The file contains ${buffer.length} bytes of data.
-
-Note: PDF text extraction is currently being enhanced. For now, the document has been uploaded and can be processed with AI services once the full text extraction is implemented.
-
-File Information:
-- Size: ${(buffer.length / 1024).toFixed(2)} KB
-- Type: PDF Document
-- Status: Uploaded and stored successfully`
-      
-      console.log(`PDF processed with placeholder text: ${placeholderText.length} characters`)
+      console.log(`Smart Parser completed: ${smartResult.text.length} characters extracted`)
       
       return {
-        text: placeholderText,
-        wordCount: placeholderText.split(/\s+/).filter(word => word.length > 0).length,
-        pages: 1, // We'll get actual page count later
+        text: smartResult.text,
+        wordCount: smartResult.wordCount,
+        pages: smartResult.pages,
         metadata: {
-          title: 'PDF Document',
-          author: 'Unknown',
-          subject: 'PDF file uploaded',
-          creator: 'VoiceLoop HR System',
-          producer: 'PDF Upload Service',
+          title: 'PDF Document (Enhanced Processing)',
+          author: 'Smart Parser',
+          subject: 'PDF processed with enhanced capabilities',
+          creator: 'VoiceLoop HR Smart Parser',
+          producer: 'Enhanced PDF Processor v2.0',
           creationDate: new Date().toISOString(),
           modificationDate: new Date().toISOString(),
-          note: 'PDF text extraction enhancement in progress',
-          bufferSize: buffer.length
-        }
+          processingVersion: smartResult.processingVersion,
+          capabilities: smartResult.capabilities,
+          processingTime: smartResult.processingTime
+        },
+        // Enhanced fields from Smart Parser
+        contentAnalysis: smartResult.contentAnalysis,
+        securityScan: smartResult.securityScan,
+        processingTime: smartResult.processingTime,
+        capabilities: smartResult.capabilities,
+        hasErrors: smartResult.hasErrors,
+        errors: smartResult.errors,
+        warnings: smartResult.warnings
       }
+      
     } catch (error) {
-      console.error("PDF processing error details:", error)
-      if (error instanceof Error) {
-        console.error("Error name:", error.name)
-        console.error("Error message:", error.message)
-        console.error("Error stack:", error.stack)
-      }
+      console.error("Smart Parser PDF processing failed:", error)
       
-      // Fallback: provide basic information about the PDF
-      console.log("Attempting PDF fallback processing...")
-      
+      // Fallback to basic processing
       const fallbackText = `PDF document uploaded successfully (${buffer.length} bytes). 
       
-Note: This PDF could not be automatically processed. The file has been uploaded and stored, but text extraction encountered an error.
+Note: Enhanced PDF processing failed, but the document has been uploaded and stored.
 
-Error details: ${error instanceof Error ? error.message : 'Unknown error'}`
+Error details: ${error instanceof Error ? error.message : 'Unknown error'}
+
+The system will attempt to process this document with basic text extraction.`
       
       return {
         text: fallbackText,
-        wordCount: fallbackText.split(/\s+/).length,
+        wordCount: fallbackText.split(/\s+/).filter(word => word.length > 0).length,
         pages: 1,
         metadata: {
-          error: "PDF processing failed, using fallback",
+          error: "Smart Parser failed, using fallback",
           originalError: error instanceof Error ? error.message : "Unknown error",
           bufferSize: buffer.length,
-          uploaded: true
-        }
+          uploaded: true,
+          processingVersion: "1.0.0 (fallback)"
+        },
+        hasErrors: true,
+        errors: [`Smart Parser failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+        warnings: ['Using fallback processing']
       }
     }
   }

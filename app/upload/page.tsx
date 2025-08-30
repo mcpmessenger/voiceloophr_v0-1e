@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
 import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2 } from "lucide-react"
 
 interface UploadedFile {
@@ -17,6 +18,7 @@ interface UploadedFile {
   status: "uploading" | "processing" | "completed" | "error"
   progress: number
   error?: string
+  warning?: string
   fileId?: string
 }
 
@@ -62,6 +64,13 @@ export default function UploadPage() {
     if (!uploadedFile) return
 
     try {
+      // Check API key availability first
+      const openaiKey = localStorage.getItem("voiceloop_openai_key")
+      if (!openaiKey) {
+        console.warn("OpenAI API key not found - file will be uploaded but not processed with AI")
+        // Continue with upload but mark for manual processing
+      }
+
       // Upload file
       const formData = new FormData()
       formData.append("file", uploadedFile.file)
@@ -72,7 +81,9 @@ export default function UploadPage() {
       })
 
       if (!uploadResponse.ok) {
-        throw new Error("Upload failed")
+        const errorData = await uploadResponse.json().catch(() => ({}))
+        const errorMessage = errorData.error || errorData.details || `Upload failed with status ${uploadResponse.status}`
+        throw new Error(errorMessage)
       }
 
       const uploadResult = await uploadResponse.json()
@@ -87,11 +98,22 @@ export default function UploadPage() {
       // Add a small delay to show processing status
       await new Promise(resolve => setTimeout(resolve, 500))
 
-      // Get OpenAI key from localStorage
-      const openaiKey = localStorage.getItem("voiceloop_openai_key")
+      // Check if we have the OpenAI key for AI processing
       if (!openaiKey) {
         // Mark as completed without AI processing if no key
-        setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: "completed", progress: 100 } : f))
+        setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+          ...f, 
+          status: "completed", 
+          progress: 100,
+          warning: "File uploaded successfully but AI processing skipped - OpenAI API key not configured"
+        } : f))
+        
+        // Show user-friendly message
+        toast({
+          title: "File Uploaded Successfully",
+          description: "File was uploaded and processed, but AI analysis was skipped because OpenAI API key is not configured. You can configure it in Settings.",
+          variant: "default",
+        })
         return
       }
 
@@ -303,6 +325,26 @@ export default function UploadPage() {
         {files.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-2xl font-light text-foreground mb-4">Processing Files ({files.length})</h2>
+            
+            {/* API Key Status */}
+            {!localStorage.getItem("voiceloop_openai_key") && (
+              <Card className="p-4 border-2 border-yellow-200 bg-yellow-50">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-yellow-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800">
+                      OpenAI API Key Not Configured
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      Files will be uploaded and processed, but AI analysis will be skipped. 
+                      <Link href="/settings" className="text-yellow-800 underline ml-1 hover:text-yellow-900">
+                        Configure API key in Settings
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             {files.map((uploadedFile) => (
                              <Card key={uploadedFile.id} className="p-6 border-2 border-primary/20 hover:border-primary/30 transition-colors duration-200 shadow-sm hover:shadow-md">
@@ -343,6 +385,9 @@ export default function UploadPage() {
                           <>
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span className="text-sm text-green-600">Complete</span>
+                            {uploadedFile.warning && (
+                              <span className="text-sm text-yellow-600 ml-2">⚠️ {uploadedFile.warning}</span>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"

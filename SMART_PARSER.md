@@ -9,6 +9,8 @@ The Smart Parser is a core component of VoiceLoop HR that intelligently extracts
 - ✅ Placeholder PDF processing (ready for enhancement)
 - ✅ DOCX, CSV, Markdown, and text file support
 - ✅ AI service integration framework
+- ✅ Enhanced error handling and API key validation
+- ✅ Graceful fallback for missing AI services
 
 ## Development Priorities
 
@@ -215,6 +217,67 @@ lib/
 - **Multiple library options** for fallback
 - **Progressive enhancement** approach
 - **Comprehensive testing** before deployment
+
+## Critical Issues & Resolutions
+
+### Tailwind CSS Configuration Issues (Resolved)
+**Problem**: During development, we encountered persistent styling issues where the application would lose all styles, resulting in unstyled pages and build failures.
+
+**Root Cause**: Configuration mismatch between Tailwind CSS v3 and v4 syntax, specifically:
+- **PostCSS Configuration**: Using `tailwindcss: {}` instead of `@tailwindcss/postcss: {}`
+- **CSS Directives**: Using `@tailwind base; @tailwind components; @tailwind utilities;` instead of `@import 'tailwindcss';`
+- **Build Cache**: Corrupted `.next` directory causing build hangs
+
+**Error Messages Encountered**:
+```
+Error: It looks like you're trying to use `tailwindcss` directly as a PostCSS plugin. 
+The PostCSS plugin has moved to a separate package, so to continue using Tailwind CSS 
+with PostCSS you'll need to install `@tailwindcss/postcss` and update your PostCSS configuration.
+```
+
+**Solution Implemented**:
+1. **Install Correct Package**: `pnpm add @tailwindcss/postcss`
+2. **Update PostCSS Config**: 
+   ```javascript
+   // postcss.config.mjs
+   plugins: {
+     '@tailwindcss/postcss': {},
+     autoprefixer: {},
+   }
+   ```
+3. **Update CSS Syntax**: 
+   ```css
+   /* styles/globals.css */
+   @import 'tailwindcss';
+   @import 'tw-animate-css';
+   ```
+4. **Remove Standard Config**: Delete `tailwind.config.js` (not needed for v4)
+5. **Clean Build Cache**: Remove `.next` directory and restart dev server
+
+**Key Learning**: Tailwind CSS v4 uses a different PostCSS plugin (`@tailwindcss/postcss`) and CSS import syntax (`@import 'tailwindcss'`) compared to v3's direct plugin usage and `@tailwind` directives.
+
+### Build Process Issues (Resolved)
+**Problem**: Build process would hang indefinitely with permission errors and module resolution issues.
+
+**Root Cause**: 
+- Multiple conflicting Node.js processes
+- Corrupted dependency cache
+- Permission issues with build artifacts
+
+**Solution Implemented**:
+1. **Process Cleanup**: Terminate all Node.js processes
+2. **Cache Cleanup**: Recursively delete `.next` build directory
+3. **Dependency Reinstall**: Use `pnpm install` to refresh dependencies
+4. **Clean Start**: Restart development server with clean environment
+
+### Error Handling Improvements (Implemented)
+**Problem**: Generic "Upload failed" errors without actionable information for users.
+
+**Solution Implemented**:
+1. **Enhanced Error Messages**: Detailed error details with suggestions
+2. **API Key Validation**: Graceful fallback when OpenAI API key is missing
+3. **User Feedback**: Toast notifications and warning banners for missing configuration
+4. **Graceful Degradation**: Continue processing without AI when services unavailable
 
 ## Next Steps
 

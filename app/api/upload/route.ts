@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { DocumentProcessor } from "@/lib/documentProcessor"
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,22 +41,31 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer)
     console.log(`File converted to buffer: ${buffer.length} bytes`)
 
-    // Process document to extract text content
-    let processedDocument
+    // Basic text extraction (temporarily simplified)
+    let extractedText = ""
+    let wordCount = 0
+    
     try {
-      console.log(`Processing file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`)
-      processedDocument = await DocumentProcessor.processDocument(
-        buffer, 
-        file.type, 
-        file.name
-      )
-      console.log(`Document processed successfully: ${processedDocument.wordCount} words`)
+      if (file.type === "text/plain" || file.type === "text/markdown" || file.type === "text/csv") {
+        extractedText = buffer.toString('utf-8')
+        wordCount = extractedText.split(/\s+/).filter(word => word.length > 0).length
+      } else if (file.type === "application/pdf") {
+        // For PDFs, just store the buffer for now
+        extractedText = `PDF document uploaded successfully (${buffer.length} bytes). Smart Parser integration temporarily disabled.`
+        wordCount = extractedText.split(/\s+/).filter(word => word.length > 0).length
+      } else {
+        extractedText = `File uploaded successfully (${buffer.length} bytes). Type: ${file.type}`
+        wordCount = extractedText.split(/\s+/).filter(word => word.length > 0).length
+      }
+      
+      console.log(`Basic processing completed: ${wordCount} words extracted`)
+      
     } catch (processingError) {
-      console.error("Document processing error:", processingError)
-      console.error("Error stack:", processingError instanceof Error ? processingError.stack : "No stack trace")
+      console.error("Basic processing error:", processingError)
       return NextResponse.json({ 
-        error: "Document processing failed", 
-        details: processingError instanceof Error ? processingError.message : "Unknown error"
+        error: "Basic processing failed",
+        details: processingError instanceof Error ? processingError.message : "Unknown error",
+        suggestion: "Try uploading a different file or check if the file is corrupted"
       }, { status: 400 })
     }
 
@@ -73,9 +81,12 @@ export async function POST(request: NextRequest) {
       buffer: buffer.toString("base64"),
       uploadedAt: new Date().toISOString(),
       // Store processed content
-      extractedText: processedDocument.text,
-      wordCount: processedDocument.wordCount,
-      metadata: processedDocument.metadata,
+      extractedText: extractedText,
+      wordCount: wordCount,
+      metadata: {
+        processingVersion: "1.0.0 (basic)",
+        note: "Smart Parser temporarily disabled for debugging"
+      },
       // Processing status
       processed: true,
       processingError: null
@@ -91,12 +102,16 @@ export async function POST(request: NextRequest) {
       fileName: file.name,
       fileType: file.type,
       fileSize: file.size,
-      wordCount: processedDocument.wordCount,
-      extractedText: processedDocument.text.substring(0, 200) + (processedDocument.text.length > 200 ? "..." : ""),
-      metadata: processedDocument.metadata
+      wordCount: wordCount,
+      extractedText: extractedText.substring(0, 200) + (extractedText.length > 200 ? "..." : ""),
+      metadata: fileData.metadata
     })
   } catch (error) {
     console.error("Upload error:", error)
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Upload failed", 
+      details: error instanceof Error ? error.message : "Unknown error",
+      suggestion: "Check server logs for more details"
+    }, { status: 500 })
   }
 }

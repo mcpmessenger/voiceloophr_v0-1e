@@ -5,8 +5,29 @@ export async function POST(request: NextRequest) {
   try {
     const { fileId, openaiKey } = await request.json()
 
-    if (!fileId || !openaiKey) {
-      return NextResponse.json({ error: "Missing fileId or OpenAI key" }, { status: 400 })
+    if (!fileId) {
+      return NextResponse.json({ 
+        error: "Missing fileId", 
+        details: "File ID is required for processing",
+        suggestion: "Please provide a valid file ID"
+      }, { status: 400 })
+    }
+
+    if (!openaiKey) {
+      return NextResponse.json({ 
+        error: "Missing OpenAI API key", 
+        details: "OpenAI API key is required for AI processing",
+        suggestion: "Please configure your OpenAI API key in the application settings"
+      }, { status: 400 })
+    }
+
+    // Validate OpenAI key format (basic check)
+    if (!openaiKey.startsWith('sk-') || openaiKey.length < 20) {
+      return NextResponse.json({ 
+        error: "Invalid OpenAI API key format", 
+        details: "API key should start with 'sk-' and be at least 20 characters long",
+        suggestion: "Please check your OpenAI API key format"
+      }, { status: 400 })
     }
 
     // Get file from memory storage
