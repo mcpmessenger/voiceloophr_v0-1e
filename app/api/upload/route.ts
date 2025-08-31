@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { EnhancedDocumentProcessor } from "../../../lib/enhancedDocumentProcessor"
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,26 +11,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type and size
-    const allowedTypes = [
-      "application/pdf", 
-      "text/markdown", 
-      "text/csv", 
-      "text/plain",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "audio/wav", 
-      "video/mp4"
-    ]
-    const maxSize = 50 * 1024 * 1024 // 50MB
-
-    if (!allowedTypes.includes(file.type) && 
-        !file.name.toLowerCase().endsWith(".md") && 
-        !file.name.toLowerCase().endsWith(".txt") &&
-        !file.name.toLowerCase().endsWith(".docx")) {
-      return NextResponse.json({ error: "Unsupported file type" }, { status: 400 })
+    const maxSize = 100 * 1024 * 1024 // 100MB for audio/video files
+    
+    // Check if file type is supported by our enhanced processor
+    if (!EnhancedDocumentProcessor.isSupported(file.type, file.name)) {
+      return NextResponse.json({ 
+        error: "Unsupported file type", 
+        supportedTypes: EnhancedDocumentProcessor.getSupportedTypes(),
+        fileName: file.name,
+        mimeType: file.type
+      }, { status: 400 })
     }
 
     if (file.size > maxSize) {
-      return NextResponse.json({ error: "File too large (max 50MB)" }, { status: 400 })
+      return NextResponse.json({ error: `File too large (max ${Math.round(maxSize / (1024 * 1024))}MB)` }, { status: 400 })
     }
 
     // Convert file to buffer for processing
@@ -41,29 +36,27 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer)
     console.log(`File converted to buffer: ${buffer.length} bytes`)
 
-    // Basic text extraction (temporarily simplified)
-    let extractedText = ""
-    let wordCount = 0
+    // Enhanced document processing using our robust parser
+    let processedDocument
     
     try {
-      if (file.type === "text/plain" || file.type === "text/markdown" || file.type === "text/csv") {
-        extractedText = buffer.toString('utf-8')
-        wordCount = extractedText.split(/\s+/).filter(word => word.length > 0).length
-      } else if (file.type === "application/pdf") {
-        // For PDFs, just store the buffer for now
-        extractedText = `PDF document uploaded successfully (${buffer.length} bytes). Smart Parser integration temporarily disabled.`
-        wordCount = extractedText.split(/\s+/).filter(word => word.length > 0).length
-      } else {
-        extractedText = `File uploaded successfully (${buffer.length} bytes). Type: ${file.type}`
-        wordCount = extractedText.split(/\s+/).filter(word => word.length > 0).length
-      }
+      console.log(`🚀 Starting enhanced processing for ${file.name}`)
       
-      console.log(`Basic processing completed: ${wordCount} words extracted`)
+      // Process the document with our enhanced processor
+      processedDocument = await EnhancedDocumentProcessor.processDocument(
+        buffer,
+        file.name,
+        file.type
+      )
+      
+      console.log(`✅ Enhanced processing completed: ${processedDocument.wordCount} words extracted`)
+      console.log(`📊 Processing method: ${processedDocument.metadata.processingMethod}`)
+      console.log(`🎯 Confidence: ${processedDocument.metadata.confidence}`)
       
     } catch (processingError) {
-      console.error("Basic processing error:", processingError)
+      console.error("Enhanced processing error:", processingError)
       return NextResponse.json({ 
-        error: "Basic processing failed",
+        error: "Enhanced processing failed",
         details: processingError instanceof Error ? processingError.message : "Unknown error",
         suggestion: "Try uploading a different file or check if the file is corrupted"
       }, { status: 400 })
@@ -72,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Generate unique file ID
     const fileId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    // Store processed file data
+    // Store processed file data with enhanced information
     const fileData = {
       id: fileId,
       name: file.name,
@@ -80,32 +73,48 @@ export async function POST(request: NextRequest) {
       size: file.size,
       buffer: buffer.toString("base64"),
       uploadedAt: new Date().toISOString(),
-      // Store processed content
-      extractedText: extractedText,
-      wordCount: wordCount,
+      
+      // Enhanced processed content
+      extractedText: processedDocument.text,
+      wordCount: processedDocument.wordCount,
+      pages: processedDocument.pages,
+      
+      // Rich metadata from enhanced processor
       metadata: {
-        processingVersion: "1.0.0 (basic)",
-        note: "Smart Parser temporarily disabled for debugging"
+        ...processedDocument.metadata,
+        processingVersion: processedDocument.metadata.processingVersion,
+        processingMethod: processedDocument.metadata.processingMethod,
+        confidence: processedDocument.metadata.confidence,
+        note: "Enhanced Smart Parser processing completed"
       },
+      
+      // Additional data from enhanced processor
+      csvData: processedDocument.csvData,
+      markdownData: processedDocument.markdownData,
+      videoMetadata: processedDocument.videoMetadata,
+      audioTranscription: processedDocument.audioTranscription,
+      
       // Processing status
-      processed: true,
-      processingError: null
+      processed: processedDocument.success,
+      processingError: processedDocument.error || null,
+      warnings: processedDocument.warnings || [],
+      processingTime: processedDocument.processingTime
     }
 
     // Store in memory (in real app, would use database)
     global.uploadedFiles = global.uploadedFiles || new Map()
     global.uploadedFiles.set(fileId, fileData)
 
-    return NextResponse.json({
-      success: true,
-      fileId,
-      fileName: file.name,
-      fileType: file.type,
-      fileSize: file.size,
-      wordCount: wordCount,
-      extractedText: extractedText.substring(0, 200) + (extractedText.length > 200 ? "..." : ""),
-      metadata: fileData.metadata
-    })
+          return NextResponse.json({
+        success: true,
+        fileId,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        wordCount: processedDocument.wordCount,
+        extractedText: processedDocument.text.substring(0, 200) + (processedDocument.text.length > 200 ? "..." : ""),
+        metadata: fileData.metadata
+      })
   } catch (error) {
     console.error("Upload error:", error)
     return NextResponse.json({ 

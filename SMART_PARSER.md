@@ -3,297 +3,196 @@
 ## Overview
 The Smart Parser is a core component of VoiceLoop HR that intelligently extracts, processes, and analyzes document content for AI-powered insights and summarization.
 
-## Current Status
+## 🚀 **NEW: AWS Textract Integration Strategy**
+
+### **Why AWS Textract?**
+- **Enterprise-Grade OCR**: 99%+ accuracy vs. 80-90% with local solutions
+- **Advanced Document Understanding**: Forms, tables, key-value pairs, handwriting
+- **Scalable Processing**: Handle enterprise document volumes
+- **Production Ready**: 99.9% uptime SLA, automatic updates
+
+### **Current Status**
 - ✅ Basic file upload and storage
 - ✅ Simple text extraction for supported formats
-- ✅ Placeholder PDF processing (ready for enhancement)
+- ✅ Enhanced PDF processing with fallback strategies
 - ✅ DOCX, CSV, Markdown, and text file support
 - ✅ AI service integration framework
 - ✅ Enhanced error handling and API key validation
 - ✅ Graceful fallback for missing AI services
 
-## Development Priorities
+## 🎯 **Development Priorities - AWS Textract Sprint**
 
-### Phase 1: Enhanced PDF Processing (High Priority)
-**Goal**: Replace placeholder PDF processing with robust text extraction
+### **Phase 1: AWS Textract Integration (Weeks 1-2) - HIGH PRIORITY**
+**Goal**: Replace current PDF processing with AWS Textract for enterprise-grade document analysis
 
-#### Technical Requirements:
-- **Server-side PDF parsing** compatible with Next.js API routes
-- **Text extraction** from all PDF types (scanned, digital, complex layouts)
-- **Metadata extraction** (title, author, pages, creation date)
-- **Page-by-page processing** for large documents
-- **Error handling** for corrupted or password-protected files
+#### **Technical Requirements:**
+- **AWS Textract Integration** with S3 storage
+- **Multi-format Support**: PDFs, images, scanned documents
+- **Advanced Extraction**: Forms, tables, key-value pairs
+- **Fallback Strategy**: Maintain current local processing as backup
+- **Error Handling**: Comprehensive AWS error handling and retry logic
 
-#### Recommended Libraries to Evaluate:
-1. **pdf-parse v2.0+** (if available) - Most stable option
-2. **pdf2pic + OCR** - For scanned documents
-3. **pdf-lib** - For metadata extraction
-4. **Custom solution** using Node.js native modules
-
-#### Implementation Approach:
+#### **Implementation Architecture:**
 ```typescript
-// Enhanced PDF processor structure
-static async processPDF(buffer: Buffer): Promise<ProcessedDocument> {
-  try {
-    // 1. Validate PDF structure
-    // 2. Extract metadata first
-    // 3. Process text content
-    // 4. Handle different PDF types (digital vs scanned)
-    // 5. Fallback to OCR if needed
-  } catch (error) {
-    // Graceful degradation with meaningful error messages
+// Enhanced Smart Parser with Textract
+export class TextractEnhancedParser extends SmartParser {
+  private textractClient: AWS.Textract;
+  private s3Client: AWS.S3;
+  
+  static async processWithTextract(buffer: Buffer): Promise<ProcessedDocument> {
+    // 1. Upload to S3 (required for Textract)
+    // 2. Process with Textract (FORMS, TABLES, LINES)
+    // 3. Parse structured results
+    // 4. Fallback to local processing if needed
   }
 }
 ```
 
-### Phase 2: Intelligent Content Analysis (Medium Priority)
-**Goal**: Add smart content understanding beyond basic text extraction
+#### **AWS Textract Features to Implement:**
+1. **Document Analysis**: `analyzeDocument` API for comprehensive extraction
+2. **Form Processing**: Automatic key-value pair detection
+3. **Table Extraction**: Convert tables to structured data (CSV/JSON)
+4. **Layout Analysis**: Document structure and hierarchy understanding
+5. **Multi-language Support**: Automatic language detection
 
-#### Features:
-- **Document classification** (resume, contract, report, etc.)
-- **Key information extraction** (dates, names, amounts, etc.)
-- **Content structure analysis** (headings, sections, tables)
-- **Language detection** and multi-language support
-- **Sensitive content detection** (PII, confidential information)
+### **Phase 2: Enhanced Content Analysis (Weeks 3-4) - MEDIUM PRIORITY**
+**Goal**: Leverage Textract's structured data for intelligent content understanding
 
-#### Implementation:
+#### **Features:**
+- **Document Classification**: Resume, contract, report, form identification
+- **Entity Extraction**: Names, dates, amounts, organizations
+- **Content Structure Analysis**: Headings, sections, tables
+- **Confidence Scoring**: Textract confidence + custom validation
+- **Sensitive Content Detection**: PII, confidential information
+
+#### **Implementation:**
 ```typescript
-interface SmartAnalysis {
-  documentType: 'resume' | 'contract' | 'report' | 'other'
+interface TextractEnhancedAnalysis extends SmartAnalysis {
+  documentType: 'resume' | 'contract' | 'report' | 'form' | 'other'
   confidence: number
   extractedEntities: {
+    forms: FormField[]
+    tables: TableData[]
+    keyValuePairs: KeyValuePair[]
     dates: string[]
     names: string[]
     amounts: number[]
     organizations: string[]
   }
-  contentStructure: {
-    sections: string[]
-    hasTableOfContents: boolean
-    estimatedReadingTime: number
+  textractMetadata: {
+    processingTime: number
+    pagesProcessed: number
+    confidence: number
+    featuresUsed: string[]
   }
-  sensitivityLevel: 'low' | 'medium' | 'high'
-  recommendations: string[]
 }
 ```
 
-### Phase 3: Advanced Processing Features (Low Priority)
-**Goal**: Enterprise-grade document processing capabilities
+### **Phase 3: Production Optimization (Weeks 5-6) - LOW PRIORITY**
+**Goal**: Enterprise-grade performance and monitoring
 
-#### Features:
-- **Batch processing** for multiple documents
-- **Version control** and document history
-- **Collaborative annotation** and commenting
-- **Export capabilities** (PDF, Word, HTML)
-- **Integration APIs** for external systems
+#### **Features:**
+- **Batch Processing**: Multiple document processing
+- **Async Processing**: Large document handling
+- **Performance Monitoring**: Processing time, accuracy metrics
+- **Cost Optimization**: S3 lifecycle policies, Textract usage optimization
+- **Integration APIs**: External system connectors
 
-## Technical Architecture
+## 🏗️ **Technical Architecture**
 
-### Current Structure:
+### **Current Structure:**
 ```
 lib/
 ├── documentProcessor.ts    # Main processing logic
 ├── aiService.ts           # AI integration
-└── types/                 # Type definitions
+└── smartParser/           # Enhanced parsing capabilities
+    ├── index.ts           # Main Smart Parser
+    ├── pdfProcessor.ts    # PDF processing (to be enhanced)
+    ├── contentAnalyzer.ts # Content analysis
+    └── securityScanner.ts # Security scanning
 ```
 
-### Proposed Enhancement:
+### **Enhanced Architecture with Textract:**
 ```
 lib/
-├── documentProcessor.ts    # Enhanced with smart parsing
-├── smartParser/           # New smart parsing modules
-│   ├── pdfProcessor.ts    # Advanced PDF handling
-│   ├── contentAnalyzer.ts # Intelligent content analysis
-│   ├── entityExtractor.ts # Named entity recognition
-│   └── securityScanner.ts # Sensitive content detection
-├── aiService.ts           # Enhanced AI capabilities
-└── types/                 # Extended type definitions
+├── documentProcessor.ts    # Main processing logic
+├── aiService.ts           # AI integration
+├── aws/                   # AWS services integration
+│   ├── textractClient.ts  # Textract API client
+│   ├── s3Client.ts        # S3 operations
+│   └── config.ts          # AWS configuration
+└── smartParser/           # Enhanced parsing capabilities
+    ├── index.ts           # Main Smart Parser (Textract enhanced)
+    ├── textractProcessor.ts # AWS Textract processing
+    ├── pdfProcessor.ts    # Local PDF fallback
+    ├── contentAnalyzer.ts # Enhanced content analysis
+    └── securityScanner.ts # Security scanning
 ```
 
-## Performance Considerations
+## 🔧 **Implementation Roadmap**
 
-### Memory Management:
-- **Streaming processing** for large files (>10MB)
-- **Buffer pooling** to prevent memory leaks
-- **Progressive loading** for multi-page documents
+### **Week 1: AWS Foundation**
+- [ ] Set up AWS account and IAM roles
+- [ ] Create S3 bucket for document processing
+- [ ] Install AWS SDK and configure credentials
+- [ ] Implement basic Textract client
 
-### Processing Speed:
-- **Parallel processing** for multiple pages
-- **Caching** of processed results
-- **Background processing** for large documents
+### **Week 2: Textract Integration**
+- [ ] Implement document upload to S3
+- [ ] Integrate Textract document analysis
+- [ ] Parse Textract results into structured data
+- [ ] Implement fallback to local processing
 
-### Scalability:
-- **Worker threads** for CPU-intensive tasks
-- **Queue system** for batch processing
-- **Database storage** for processed results
+### **Week 3: Enhanced Analysis**
+- [ ] Leverage Textract forms and tables data
+- [ ] Implement document classification
+- [ ] Add entity extraction capabilities
+- [ ] Create confidence scoring system
 
-## Security & Privacy
+### **Week 4: Testing & Optimization**
+- [ ] Comprehensive testing with various document types
+- [ ] Performance benchmarking
+- [ ] Error handling and edge cases
+- [ ] Documentation and deployment
 
-### Data Protection:
-- **PII detection** and redaction options
-- **Encryption** of stored documents
-- **Access control** and audit logging
-- **GDPR compliance** features
+## 📊 **Success Metrics**
 
-### Content Scanning:
-- **Malware detection** in uploaded files
-- **Content validation** and sanitization
-- **Rate limiting** for uploads
+### **Performance Targets:**
+- **Accuracy**: >95% text extraction accuracy (vs. current 80-90%)
+- **Processing Speed**: <10 seconds for standard documents
+- **Success Rate**: >98% document processing success
+- **Cost Efficiency**: <$0.10 per document processed
 
-## Testing Strategy
+### **Quality Metrics:**
+- **Form Recognition**: >90% form field detection accuracy
+- **Table Extraction**: >95% table structure preservation
+- **Multi-language**: Support for 5+ languages
+- **Document Types**: Handle 10+ document formats
 
-### Unit Tests:
-- Individual parser components
-- Error handling scenarios
-- Performance benchmarks
+## 🚨 **Risk Mitigation**
 
-### Integration Tests:
-- End-to-end document processing
-- AI service integration
-- File format compatibility
+### **Technical Risks:**
+- **AWS Dependency**: Implement comprehensive fallback strategies
+- **Cost Overruns**: Monitor usage and implement cost controls
+- **Performance Issues**: Benchmark and optimize processing pipelines
 
-### Performance Tests:
-- Large file processing
-- Concurrent uploads
-- Memory usage monitoring
+### **Business Risks:**
+- **Data Privacy**: Ensure S3 bucket security and data lifecycle policies
+- **Compliance**: Verify GDPR/CCPA compliance for document processing
+- **Vendor Lock-in**: Maintain local processing capabilities as backup
 
-## Success Metrics
+## 📚 **Resources & References**
 
-### Technical Metrics:
-- **Processing success rate**: >95%
-- **Text extraction accuracy**: >90%
-- **Processing speed**: <30 seconds for 10MB files
-- **Memory usage**: <100MB per document
+### **AWS Documentation:**
+- [AWS Textract Developer Guide](https://docs.aws.amazon.com/textract/)
+- [Textract API Reference](https://docs.aws.amazon.com/textract/latest/dg/API_Reference.html)
+- [S3 Integration Best Practices](https://docs.aws.amazon.com/AmazonS3/latest/userguide/)
 
-### User Experience Metrics:
-- **Upload success rate**: >98%
-- **Processing time perception**: <2 minutes
-- **Error message clarity**: User satisfaction >4/5
-
-## Development Timeline
-
-### Week 1-2: Enhanced PDF Processing
-- Research and select PDF library
-- Implement robust text extraction
-- Add comprehensive error handling
-
-### Week 3-4: Content Analysis
-- Implement document classification
-- Add entity extraction
-- Create content structure analysis
-
-### Week 5-6: Testing & Optimization
-- Comprehensive testing
-- Performance optimization
-- User feedback integration
-
-## Resources & Dependencies
-
-### Required Skills:
-- **Node.js/TypeScript** expertise
-- **PDF processing** knowledge
-- **AI/ML integration** experience
-- **Performance optimization** skills
-
-### External Dependencies:
-- **PDF processing library** (to be selected)
-- **OCR service** (for scanned documents)
-- **AI/ML services** (OpenAI, etc.)
-- **Testing frameworks** (Jest, Playwright)
-
-## Risk Assessment
-
-### High Risk:
-- **PDF library compatibility** with Next.js
-- **Performance** with large documents
-- **AI service costs** and rate limits
-
-### Medium Risk:
-- **Content accuracy** across different formats
-- **User experience** during processing
-- **Security** of uploaded content
-
-### Mitigation Strategies:
-- **Multiple library options** for fallback
-- **Progressive enhancement** approach
-- **Comprehensive testing** before deployment
-
-## Critical Issues & Resolutions
-
-### Tailwind CSS Configuration Issues (Resolved)
-**Problem**: During development, we encountered persistent styling issues where the application would lose all styles, resulting in unstyled pages and build failures.
-
-**Root Cause**: Configuration mismatch between Tailwind CSS v3 and v4 syntax, specifically:
-- **PostCSS Configuration**: Using `tailwindcss: {}` instead of `@tailwindcss/postcss: {}`
-- **CSS Directives**: Using `@tailwind base; @tailwind components; @tailwind utilities;` instead of `@import 'tailwindcss';`
-- **Build Cache**: Corrupted `.next` directory causing build hangs
-
-**Error Messages Encountered**:
-```
-Error: It looks like you're trying to use `tailwindcss` directly as a PostCSS plugin. 
-The PostCSS plugin has moved to a separate package, so to continue using Tailwind CSS 
-with PostCSS you'll need to install `@tailwindcss/postcss` and update your PostCSS configuration.
-```
-
-**Solution Implemented**:
-1. **Install Correct Package**: `pnpm add @tailwindcss/postcss`
-2. **Update PostCSS Config**: 
-   ```javascript
-   // postcss.config.mjs
-   plugins: {
-     '@tailwindcss/postcss': {},
-     autoprefixer: {},
-   }
-   ```
-3. **Update CSS Syntax**: 
-   ```css
-   /* styles/globals.css */
-   @import 'tailwindcss';
-   @import 'tw-animate-css';
-   ```
-4. **Remove Standard Config**: Delete `tailwind.config.js` (not needed for v4)
-5. **Clean Build Cache**: Remove `.next` directory and restart dev server
-
-**Key Learning**: Tailwind CSS v4 uses a different PostCSS plugin (`@tailwindcss/postcss`) and CSS import syntax (`@import 'tailwindcss'`) compared to v3's direct plugin usage and `@tailwind` directives.
-
-### Build Process Issues (Resolved)
-**Problem**: Build process would hang indefinitely with permission errors and module resolution issues.
-
-**Root Cause**: 
-- Multiple conflicting Node.js processes
-- Corrupted dependency cache
-- Permission issues with build artifacts
-
-**Solution Implemented**:
-1. **Process Cleanup**: Terminate all Node.js processes
-2. **Cache Cleanup**: Recursively delete `.next` build directory
-3. **Dependency Reinstall**: Use `pnpm install` to refresh dependencies
-4. **Clean Start**: Restart development server with clean environment
-
-### Error Handling Improvements (Implemented)
-**Problem**: Generic "Upload failed" errors without actionable information for users.
-
-**Solution Implemented**:
-1. **Enhanced Error Messages**: Detailed error details with suggestions
-2. **API Key Validation**: Graceful fallback when OpenAI API key is missing
-3. **User Feedback**: Toast notifications and warning banners for missing configuration
-4. **Graceful Degradation**: Continue processing without AI when services unavailable
-
-## Next Steps
-
-1. **Immediate**: Research and test PDF libraries
-2. **Short-term**: Implement enhanced PDF processing
-3. **Medium-term**: Add smart content analysis
-4. **Long-term**: Enterprise features and scaling
-
-## Questions for Development Team
-
-1. **PDF Library Selection**: Which library provides the best balance of features and stability?
-2. **Performance Requirements**: What are the acceptable processing times for different file sizes?
-3. **AI Integration**: How should we handle AI service rate limits and costs?
-4. **Security Requirements**: What level of content scanning and PII detection is needed?
-5. **User Experience**: How should we communicate processing progress and errors?
+### **Implementation Examples:**
+- [Textract Forms Processing](https://docs.aws.amazon.com/textract/latest/dg/forms.html)
+- [Table Extraction](https://docs.aws.amazon.com/textract/latest/dg/tables.html)
+- [Async Processing](https://docs.aws.amazon.com/textract/latest/dg/async.html)
 
 ---
 
-*This document should be updated as development progresses and new requirements emerge.*
+**🎯 Ready to kick off the AWS Textract sprint! This will transform your smart parser from basic OCR to enterprise-grade document intelligence.**
