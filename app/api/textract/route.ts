@@ -93,7 +93,9 @@ This extracted content represents the actual text and visual elements from your 
 
       // Store updated data
       global.uploadedFiles.set(fileId, fileData)
-
+      
+      // Note: localStorage will be handled client-side after successful processing
+      
       console.log(`✅ Textract processing completed: ${wordCount} words extracted`)
 
       return NextResponse.json({

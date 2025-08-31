@@ -1,3 +1,8 @@
+// Import analyzer classes
+import { TextAnalyzer } from './textAnalyzer'
+import { EntityExtractor } from './entityExtractor'
+import { SentimentAnalyzer } from './sentimentAnalyzer'
+
 // Export all analyzer classes
 export { TextAnalyzer } from './textAnalyzer'
 export { EntityExtractor } from './entityExtractor'

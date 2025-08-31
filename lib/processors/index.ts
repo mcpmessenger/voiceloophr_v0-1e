@@ -1,3 +1,8 @@
+// Import processor classes
+import { AudioProcessor } from './audioProcessor'
+import { VideoProcessor } from './videoProcessor'
+import { DocumentProcessor } from './documentProcessor'
+
 // Export all processor classes
 export { AudioProcessor } from './audioProcessor'
 export { VideoProcessor } from './videoProcessor'

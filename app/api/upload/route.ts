@@ -143,7 +143,9 @@ export async function POST(request: NextRequest) {
 
     // Store in global memory
     global.uploadedFiles.set(fileId, fileData)
-
+    
+    // Note: localStorage will be handled client-side after successful upload
+    
     // Return success response
     return NextResponse.json({
       success: true,

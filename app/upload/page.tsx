@@ -89,6 +89,38 @@ export default function UploadPage() {
 
       const uploadResult = await uploadResponse.json()
 
+      // Save to localStorage for persistence (client-side)
+      try {
+        const fileData = {
+          id: uploadResult.fileId,
+          name: uploadedFile.file.name,
+          type: uploadedFile.file.type,
+          size: uploadedFile.file.size,
+          buffer: "", // We don't need to store the full buffer in localStorage
+          uploadedAt: new Date().toISOString(),
+          processed: false,
+          processingError: null,
+          warnings: [],
+          extractedText: uploadResult.extractedText || "",
+          wordCount: uploadResult.wordCount || 0,
+          pages: 1,
+          metadata: {
+            processingVersion: "1.0.0",
+            processingMethod: "upload",
+            confidence: 0.8,
+            note: "File uploaded successfully"
+          }
+        }
+        
+        // Save to localStorage
+        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+        existing[uploadResult.fileId] = fileData
+        localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+        console.log(`✅ File ${uploadResult.fileId} saved to localStorage`)
+      } catch (error) {
+        console.warn('Failed to save to localStorage:', error)
+      }
+
       // Update with file ID from server
       setFiles((prev) =>
         prev.map((f) =>
@@ -110,11 +142,7 @@ export default function UploadPage() {
         } : f))
         
         // Show user-friendly message
-        toast({
-          title: "File Uploaded Successfully",
-          description: "File was uploaded and processed, but AI analysis was skipped because OpenAI API key is not configured. You can configure it in Settings.",
-          variant: "default",
-        })
+        toast("File was uploaded and processed, but AI analysis was skipped because OpenAI API key is not configured. You can configure it in Settings.")
         return
       }
 
@@ -128,11 +156,7 @@ export default function UploadPage() {
            showTextractButton: true
          } : f))
          
-         toast({
-           title: "File Uploaded Successfully",
-           description: "PDF/image uploaded. Click 'Process with Textract' to extract text content.",
-           variant: "default",
-         })
+         toast("PDF/image uploaded. Click 'Process with Textract' to extract text content.")
          return
        }
 
@@ -265,6 +289,31 @@ export default function UploadPage() {
 
       const result = await response.json()
 
+      // Save updated file data to localStorage
+      try {
+        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+        if (existing[fileToProcess.fileId]) {
+          existing[fileToProcess.fileId] = {
+            ...existing[fileToProcess.fileId],
+            extractedText: result.extractedText,
+            wordCount: result.wordCount,
+            processed: true,
+            processingMethod: "textract",
+            processingTime: new Date().toISOString(),
+            metadata: {
+              ...existing[fileToProcess.fileId].metadata,
+              processingMethod: "textract",
+              confidence: 0.95,
+              note: "Text extracted using AWS Textract"
+            }
+          }
+          localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+          console.log(`✅ Updated file ${fileToProcess.fileId} in localStorage with Textract results`)
+        }
+      } catch (error) {
+        console.warn('Failed to update localStorage:', error)
+      }
+
       // Update file with extracted content
       setFiles((prev) =>
         prev.map((f) =>
@@ -278,11 +327,7 @@ export default function UploadPage() {
         )
       )
 
-      toast({
-        title: "Text Extraction Complete",
-        description: `Successfully extracted ${result.wordCount} words using AWS Textract`,
-        variant: "default",
-      })
+      toast(`Successfully extracted ${result.wordCount} words using AWS Textract`)
 
     } catch (error) {
       console.error("Textract processing error:", error)
@@ -298,11 +343,7 @@ export default function UploadPage() {
         )
       )
 
-      toast({
-        title: "Textract Processing Failed",
-        description: "Failed to extract text. Please try again.",
-        variant: "destructive",
-      })
+      toast("Failed to extract text. Please try again.")
     }
   }
 
