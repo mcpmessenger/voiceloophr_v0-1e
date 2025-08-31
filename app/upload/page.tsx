@@ -20,6 +20,7 @@ interface UploadedFile {
   error?: string
   warning?: string
   fileId?: string
+  showTextractButton?: boolean
 }
 
 const ACCEPTED_FILE_TYPES = {
@@ -88,6 +89,38 @@ export default function UploadPage() {
 
       const uploadResult = await uploadResponse.json()
 
+      // Save to localStorage for persistence (client-side)
+      try {
+        const fileData = {
+          id: uploadResult.fileId,
+          name: uploadedFile.file.name,
+          type: uploadedFile.file.type,
+          size: uploadedFile.file.size,
+          buffer: "", // We don't need to store the full buffer in localStorage
+          uploadedAt: new Date().toISOString(),
+          processed: false,
+          processingError: null,
+          warnings: [],
+          extractedText: uploadResult.extractedText || "",
+          wordCount: uploadResult.wordCount || 0,
+          pages: 1,
+          metadata: {
+            processingVersion: "1.0.0",
+            processingMethod: "upload",
+            confidence: 0.8,
+            note: "File uploaded successfully"
+          }
+        }
+        
+        // Save to localStorage
+        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+        existing[uploadResult.fileId] = fileData
+        localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+        console.log(`✅ File ${uploadResult.fileId} saved to localStorage`)
+      } catch (error) {
+        console.warn('Failed to save to localStorage:', error)
+      }
+
       // Update with file ID from server
       setFiles((prev) =>
         prev.map((f) =>
@@ -109,13 +142,23 @@ export default function UploadPage() {
         } : f))
         
         // Show user-friendly message
-        toast({
-          title: "File Uploaded Successfully",
-          description: "File was uploaded and processed, but AI analysis was skipped because OpenAI API key is not configured. You can configure it in Settings.",
-          variant: "default",
-        })
+        toast("File was uploaded and processed, but AI analysis was skipped because OpenAI API key is not configured. You can configure it in Settings.")
         return
       }
+
+             // For PDFs and images, we need to extract text first before AI processing
+       if (uploadedFile.file.type.includes('pdf') || uploadedFile.file.type.includes('image')) {
+         setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+           ...f, 
+           status: "completed", 
+           progress: 100,
+           warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
+           showTextractButton: true
+         } : f))
+         
+         toast("PDF/image uploaded. Click 'Process with Textract' to extract text content.")
+         return
+       }
 
       // Process file with AI with timeout
       const controller = new AbortController()
@@ -214,6 +257,93 @@ export default function UploadPage() {
         )
       )
       processFile(fileId, fileToRetry)
+    }
+  }
+
+  const processWithTextract = async (fileId: string) => {
+    const fileToProcess = files.find(f => f.id === fileId)
+    if (!fileToProcess || !fileToProcess.fileId) return
+
+    try {
+      // Update status to processing
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { ...f, status: "processing", progress: 50 } : f
+        )
+      )
+
+      // Call Textract API
+      const response = await fetch("/api/textract", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileId: fileToProcess.fileId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Textract processing failed")
+      }
+
+      const result = await response.json()
+
+      // Save updated file data to localStorage
+      try {
+        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+        if (existing[fileToProcess.fileId]) {
+          existing[fileToProcess.fileId] = {
+            ...existing[fileToProcess.fileId],
+            extractedText: result.extractedText,
+            wordCount: result.wordCount,
+            processed: true,
+            processingMethod: "textract",
+            processingTime: new Date().toISOString(),
+            metadata: {
+              ...existing[fileToProcess.fileId].metadata,
+              processingMethod: "textract",
+              confidence: 0.95,
+              note: "Text extracted using AWS Textract"
+            }
+          }
+          localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+          console.log(`✅ Updated file ${fileToProcess.fileId} in localStorage with Textract results`)
+        }
+      } catch (error) {
+        console.warn('Failed to update localStorage:', error)
+      }
+
+      // Update file with extracted content
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "completed", 
+            progress: 100,
+            warning: "Text extracted successfully using AWS Textract",
+            showTextractButton: false
+          } : f
+        )
+      )
+
+      toast(`Successfully extracted ${result.wordCount} words using AWS Textract`)
+
+    } catch (error) {
+      console.error("Textract processing error:", error)
+      
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "error", 
+            error: "Textract processing failed. Please try again.",
+            showTextractButton: true
+          } : f
+        )
+      )
+
+      toast("Failed to extract text. Please try again.")
     }
   }
 
@@ -385,17 +515,27 @@ export default function UploadPage() {
                           <>
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span className="text-sm text-green-600">Complete</span>
-                            {uploadedFile.warning && (
-                              <span className="text-sm text-yellow-600 ml-2">⚠️ {uploadedFile.warning}</span>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
-                              onClick={() => viewResults(uploadedFile)}
-                            >
-                              View Results
-                            </Button>
+                                                         {uploadedFile.warning && (
+                               <span className="text-sm text-yellow-600 ml-2">⚠️ {uploadedFile.warning}</span>
+                             )}
+                             {uploadedFile.showTextractButton && (
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                                 onClick={() => processWithTextract(uploadedFile.id)}
+                               >
+                                 Process with Textract
+                               </Button>
+                             )}
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                               onClick={() => viewResults(uploadedFile)}
+                             >
+                               View Results
+                             </Button>
                           </>
                         )}
                         {uploadedFile.status === "error" && (

@@ -1,5 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+// Mock storage for development (replace with Supabase in production)
+declare global {
+  var documentEmbeddings: Map<string, any[]> | undefined
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { fileId, openaiKey } = await request.json()

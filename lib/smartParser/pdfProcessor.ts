@@ -1,4 +1,4 @@
-import * as pdfParse from 'pdf-parse'
+import pdfParse from 'pdf-parse'
 import { PDFDocument } from 'pdf-lib'
 import { createWorker } from 'tesseract.js'
 

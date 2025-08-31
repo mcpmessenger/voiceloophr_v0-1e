@@ -30,6 +30,8 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [audioChunks, setAudioChunks] = useState<Blob[]>([])
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
+  const [audioProgress, setAudioProgress] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
     try {
       const openaiKey = localStorage.getItem("voiceloop_openai_key")
       if (!openaiKey) {
-        throw new Error("OpenAI API key not configured")
+        throw new Error("OpenAI API key not configured. Please add your API key in Settings.")
       }
 
       const formData = new FormData()
@@ -100,10 +102,15 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
       })
 
       if (!response.ok) {
-        throw new Error("Speech-to-text failed")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Speech-to-text failed")
       }
 
       const result = await response.json()
+
+      if (!result.success || !result.transcription) {
+        throw new Error("Invalid response from STT API")
+      }
 
       // Add user message
       const userMessage: Message = {
@@ -120,6 +127,15 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
       await sendMessage(result.transcription, true)
     } catch (error) {
       console.error("Voice processing error:", error)
+      
+      // Show error message to user
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: "assistant",
+        content: `Voice Processing Error: ${error instanceof Error ? error.message : "Failed to process voice input"}`,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorMessage])
     } finally {
       setIsProcessing(false)
     }
@@ -219,15 +235,70 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
       })
 
       if (!response.ok) {
-        throw new Error("TTS failed")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "TTS failed")
       }
 
-      // Simulate audio playback
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Handle audio streaming response
+      const audioBlob = await response.blob()
+      const audioUrl = URL.createObjectURL(audioBlob)
+      
+      // Create and play audio
+      const audio = new Audio(audioUrl)
+      setCurrentAudio(audio)
+      
+      audio.onloadedmetadata = () => {
+        audio.play().catch((error) => {
+          console.error("Audio playback failed:", error)
+          setIsSpeaking(false)
+        })
+      }
+
+      audio.ontimeupdate = () => {
+        if (audio.duration) {
+          setAudioProgress((audio.currentTime / audio.duration) * 100)
+        }
+      }
+
+      audio.onended = () => {
+        setIsSpeaking(false)
+        setAudioProgress(0)
+        setCurrentAudio(null)
+        URL.revokeObjectURL(audioUrl) // Clean up memory
+      }
+
+      audio.onerror = (error) => {
+        console.error("Audio error:", error)
+        setIsSpeaking(false)
+        setAudioProgress(0)
+        setCurrentAudio(null)
+        URL.revokeObjectURL(audioUrl)
+      }
+
     } catch (error) {
       console.error("TTS error:", error)
-    } finally {
       setIsSpeaking(false)
+      setAudioProgress(0)
+      setCurrentAudio(null)
+      
+      // Show error message to user
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: "assistant",
+        content: `TTS Error: ${error instanceof Error ? error.message : "Failed to generate speech"}`,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    }
+  }
+
+  const stopAudio = () => {
+    if (currentAudio) {
+      currentAudio.pause()
+      currentAudio.currentTime = 0
+      setIsSpeaking(false)
+      setAudioProgress(0)
+      setCurrentAudio(null)
     }
   }
 
@@ -305,9 +376,28 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
         </form>
 
         {isSpeaking && (
-          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-            <Volume2 className="h-4 w-4 animate-pulse" />
-            <span className="font-light">Speaking response...</span>
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Volume2 className="h-4 w-4 animate-pulse" />
+              <span className="font-light">Speaking response...</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={stopAudio}
+                className="ml-auto h-6 px-2 text-xs"
+              >
+                Stop
+              </Button>
+            </div>
+            
+            {/* Audio Progress Bar */}
+            <div className="w-full bg-muted rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-100 ease-out"
+                style={{ width: `${audioProgress}%` }}
+              />
+            </div>
           </div>
         )}
       </div>
