@@ -20,6 +20,7 @@ interface UploadedFile {
   error?: string
   warning?: string
   fileId?: string
+  showTextractButton?: boolean
 }
 
 const ACCEPTED_FILE_TYPES = {
@@ -116,6 +117,24 @@ export default function UploadPage() {
         })
         return
       }
+
+             // For PDFs and images, we need to extract text first before AI processing
+       if (uploadedFile.file.type.includes('pdf') || uploadedFile.file.type.includes('image')) {
+         setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+           ...f, 
+           status: "completed", 
+           progress: 100,
+           warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
+           showTextractButton: true
+         } : f))
+         
+         toast({
+           title: "File Uploaded Successfully",
+           description: "PDF/image uploaded. Click 'Process with Textract' to extract text content.",
+           variant: "default",
+         })
+         return
+       }
 
       // Process file with AI with timeout
       const controller = new AbortController()
@@ -214,6 +233,76 @@ export default function UploadPage() {
         )
       )
       processFile(fileId, fileToRetry)
+    }
+  }
+
+  const processWithTextract = async (fileId: string) => {
+    const fileToProcess = files.find(f => f.id === fileId)
+    if (!fileToProcess || !fileToProcess.fileId) return
+
+    try {
+      // Update status to processing
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { ...f, status: "processing", progress: 50 } : f
+        )
+      )
+
+      // Call Textract API
+      const response = await fetch("/api/textract", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileId: fileToProcess.fileId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Textract processing failed")
+      }
+
+      const result = await response.json()
+
+      // Update file with extracted content
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "completed", 
+            progress: 100,
+            warning: "Text extracted successfully using AWS Textract",
+            showTextractButton: false
+          } : f
+        )
+      )
+
+      toast({
+        title: "Text Extraction Complete",
+        description: `Successfully extracted ${result.wordCount} words using AWS Textract`,
+        variant: "default",
+      })
+
+    } catch (error) {
+      console.error("Textract processing error:", error)
+      
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "error", 
+            error: "Textract processing failed. Please try again.",
+            showTextractButton: true
+          } : f
+        )
+      )
+
+      toast({
+        title: "Textract Processing Failed",
+        description: "Failed to extract text. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -385,17 +474,27 @@ export default function UploadPage() {
                           <>
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span className="text-sm text-green-600">Complete</span>
-                            {uploadedFile.warning && (
-                              <span className="text-sm text-yellow-600 ml-2">⚠️ {uploadedFile.warning}</span>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
-                              onClick={() => viewResults(uploadedFile)}
-                            >
-                              View Results
-                            </Button>
+                                                         {uploadedFile.warning && (
+                               <span className="text-sm text-yellow-600 ml-2">⚠️ {uploadedFile.warning}</span>
+                             )}
+                             {uploadedFile.showTextractButton && (
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                                 onClick={() => processWithTextract(uploadedFile.id)}
+                               >
+                                 Process with Textract
+                               </Button>
+                             )}
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                               onClick={() => viewResults(uploadedFile)}
+                             >
+                               View Results
+                             </Button>
                           </>
                         )}
                         {uploadedFile.status === "error" && (

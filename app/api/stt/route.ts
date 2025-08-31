@@ -10,23 +10,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing audio file or OpenAI key" }, { status: 400 })
     }
 
-    // In a real implementation, this would call OpenAI Whisper API
-    // For now, simulate speech-to-text
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    // Validate audio file
+    if (audioFile.size === 0) {
+      return NextResponse.json({ error: "Audio file is empty" }, { status: 400 })
+    }
 
-    const simulatedTranscription =
-      "This is a simulated transcription of your voice input. In a real implementation, this would use OpenAI's Whisper API to convert your speech to text with high accuracy."
+    // Check file size (Whisper has a 25MB limit)
+    if (audioFile.size > 25 * 1024 * 1024) {
+      return NextResponse.json({ error: "Audio file too large. Maximum size is 25MB" }, { status: 400 })
+    }
 
-    return NextResponse.json({
-      success: true,
-      transcription: simulatedTranscription,
-    })
-
-    /* Real implementation would be:
+    // Create FormData for OpenAI Whisper API
     const whisperFormData = new FormData()
     whisperFormData.append('file', audioFile)
     whisperFormData.append('model', 'whisper-1')
 
+    // Call OpenAI Whisper API
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
@@ -36,14 +35,30 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      throw new Error('Speech-to-text failed')
+      const errorData = await response.json().catch(() => ({}))
+      const errorMessage = errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`
+      throw new Error(`Speech-to-text failed: ${errorMessage}`)
     }
 
     const result = await response.json()
-    return NextResponse.json({ success: true, transcription: result.text })
-    */
+    
+    if (!result.text) {
+      throw new Error('No transcription text received from Whisper API')
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      transcription: result.text,
+      model: 'whisper-1',
+      language: result.language || 'unknown'
+    })
+
   } catch (error) {
     console.error("STT error:", error)
-    return NextResponse.json({ error: "Speech-to-text failed" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Speech-to-text failed"
+    return NextResponse.json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error : undefined
+    }, { status: 500 })
   }
 }

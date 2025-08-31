@@ -1,5 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { EnhancedDocumentProcessor } from "../../../lib/enhancedDocumentProcessor"
+import { TextractClient, DetectDocumentTextCommand } from '@aws-sdk/client-textract'
+
+// Use global storage to match the process API route
+declare global {
+  var uploadedFiles: Map<string, any>
+}
+
+if (!global.uploadedFiles) {
+  global.uploadedFiles = new Map()
+}
+
+// Initialize Textract client
+const textractClient = new TextractClient({ region: 'us-east-1' })
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,62 +22,96 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    // Validate file type and size
-    const maxSize = 100 * 1024 * 1024 // 100MB for audio/video files
-    
-    // Check if file type is supported by our enhanced processor
-    if (!EnhancedDocumentProcessor.isSupported(file.type, file.name)) {
+    // Validate file size (100MB max)
+    const maxSize = 100 * 1024 * 1024
+    if (file.size > maxSize) {
       return NextResponse.json({ 
-        error: "Unsupported file type", 
-        supportedTypes: EnhancedDocumentProcessor.getSupportedTypes(),
+        error: `File too large (max ${Math.round(maxSize / (1024 * 1024))}MB)` 
+      }, { status: 400 })
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'text/plain', 'text/markdown', 'text/csv',
+      'application/pdf', 'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff',
+      'audio/wav', 'audio/mp3', 'audio/mpeg',
+      'video/mp4', 'video/avi', 'video/mov'
+    ]
+
+    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(txt|md|csv|pdf|doc|docx|jpg|jpeg|png|gif|bmp|tiff|wav|mp3|mp4|avi|mov)$/i)) {
+      return NextResponse.json({ 
+        error: "Unsupported file type",
+        supportedTypes: allowedTypes,
         fileName: file.name,
         mimeType: file.type
       }, { status: 400 })
     }
 
-    if (file.size > maxSize) {
-      return NextResponse.json({ error: `File too large (max ${Math.round(maxSize / (1024 * 1024))}MB)` }, { status: 400 })
-    }
-
-    // Convert file to buffer for processing
+    // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer()
     if (!arrayBuffer || arrayBuffer.byteLength === 0) {
       return NextResponse.json({ error: "File is empty or corrupted" }, { status: 400 })
     }
     
     const buffer = Buffer.from(arrayBuffer)
-    console.log(`File converted to buffer: ${buffer.length} bytes`)
+    console.log(`File uploaded: ${file.name}, ${buffer.length} bytes, type: ${file.type}`)
 
-    // Enhanced document processing using our robust parser
-    let processedDocument
+    // Text extraction for different file types
+    let extractedText = ""
+    let wordCount = 0
+    let processingMethod = "basic"
     
-    try {
-      console.log(`🚀 Starting enhanced processing for ${file.name}`)
-      
-      // Process the document with our enhanced processor
-      processedDocument = await EnhancedDocumentProcessor.processDocument(
-        buffer,
-        file.name,
-        file.type
-      )
-      
-      console.log(`✅ Enhanced processing completed: ${processedDocument.wordCount} words extracted`)
-      console.log(`📊 Processing method: ${processedDocument.metadata.processingMethod}`)
-      console.log(`🎯 Confidence: ${processedDocument.metadata.confidence}`)
-      
-    } catch (processingError) {
-      console.error("Enhanced processing error:", processingError)
-      return NextResponse.json({ 
-        error: "Enhanced processing failed",
-        details: processingError instanceof Error ? processingError.message : "Unknown error",
-        suggestion: "Try uploading a different file or check if the file is corrupted"
-      }, { status: 400 })
+    if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|csv)$/i)) {
+      // Direct text extraction for text files (FREE)
+      try {
+        extractedText = buffer.toString('utf-8')
+        wordCount = extractedText.split(/\s+/).filter(word => word.length > 0).length
+        processingMethod = "direct"
+        console.log(`Text extracted directly: ${wordCount} words`)
+      } catch (textError) {
+        console.warn(`Text extraction failed for ${file.name}:`, textError)
+        extractedText = ""
+        wordCount = 0
+      }
+    } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+      // Use Textract for PDF files ($0.0015 per page)
+      try {
+        console.log(`Processing PDF with Textract: ${file.name}`)
+        
+        // For now, we'll store the PDF buffer and mark it for Textract processing
+        // In a production app, you'd upload to S3 first, then call Textract
+        extractedText = "[PDF content - Textract processing required]"
+        wordCount = 0
+        processingMethod = "textract"
+        console.log(`PDF marked for Textract processing`)
+      } catch (textractError) {
+        console.warn(`Textract processing failed for ${file.name}:`, textractError)
+        extractedText = ""
+        wordCount = 0
+        processingMethod = "basic"
+      }
+    } else if (file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|gif|bmp|tiff)$/i)) {
+      // Use Textract for image files ($0.0015 per page)
+      try {
+        console.log(`Processing image with Textract: ${file.name}`)
+        extractedText = "[Image content - Textract processing required]"
+        wordCount = 0
+        processingMethod = "textract"
+        console.log(`Image marked for Textract processing`)
+      } catch (textractError) {
+        console.warn(`Textract processing failed for ${file.name}:`, textractError)
+        extractedText = ""
+        wordCount = 0
+        processingMethod = "basic"
+      }
     }
 
     // Generate unique file ID
     const fileId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    // Store processed file data with enhanced information
+    // Store file data
     const fileData = {
       id: fileId,
       name: file.name,
@@ -74,53 +120,94 @@ export async function POST(request: NextRequest) {
       buffer: buffer.toString("base64"),
       uploadedAt: new Date().toISOString(),
       
-      // Enhanced processed content
-      extractedText: processedDocument.text,
-      wordCount: processedDocument.wordCount,
-      pages: processedDocument.pages,
+      // Basic processing info
+      processed: false,
+      processingError: null,
+      warnings: [],
       
-      // Rich metadata from enhanced processor
+      // Content (filled during upload for text files)
+      extractedText: extractedText,
+      wordCount: wordCount,
+      pages: 1,
+      
+      // Metadata
       metadata: {
-        ...processedDocument.metadata,
-        processingVersion: processedDocument.metadata.processingVersion,
-        processingMethod: processedDocument.metadata.processingMethod,
-        confidence: processedDocument.metadata.confidence,
-        note: "Enhanced Smart Parser processing completed"
-      },
-      
-      // Additional data from enhanced processor
-      csvData: processedDocument.csvData,
-      markdownData: processedDocument.markdownData,
-      videoMetadata: processedDocument.videoMetadata,
-      audioTranscription: processedDocument.audioTranscription,
-      
-      // Processing status
-      processed: processedDocument.success,
-      processingError: processedDocument.error || null,
-      warnings: processedDocument.warnings || [],
-      processingTime: processedDocument.processingTime
+        processingVersion: "1.0.0",
+        processingMethod: processingMethod,
+        confidence: processingMethod === "direct" ? 1.0 : 0.5,
+        note: processingMethod === "direct" ? "Text extracted during upload" : 
+              processingMethod === "textract" ? "File uploaded, Textract processing required" :
+              "File uploaded successfully, ready for processing"
+      }
     }
 
-    // Store in memory (in real app, would use database)
-    global.uploadedFiles = global.uploadedFiles || new Map()
+    // Store in global memory
     global.uploadedFiles.set(fileId, fileData)
 
-          return NextResponse.json({
-        success: true,
-        fileId,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        wordCount: processedDocument.wordCount,
-        extractedText: processedDocument.text.substring(0, 200) + (processedDocument.text.length > 200 ? "..." : ""),
-        metadata: fileData.metadata
-      })
+    // Return success response
+    return NextResponse.json({
+      success: true,
+      fileId,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+      wordCount: wordCount,
+      extractedText: extractedText ? extractedText.substring(0, 200) + (extractedText.length > 200 ? "..." : "") : "",
+      message: processingMethod === "direct" ? "File uploaded and text extracted successfully" : 
+               processingMethod === "textract" ? "File uploaded successfully. Text extraction requires AWS Textract processing." :
+               "File uploaded successfully and ready for processing"
+    })
+
   } catch (error) {
     console.error("Upload error:", error)
+    
+    // Provide more specific error messages
+    let errorMessage = "Upload failed"
+    let statusCode = 500
+    
+    if (error instanceof Error) {
+      if (error.message.includes("File too large")) {
+        errorMessage = "File size exceeds limit"
+        statusCode = 400
+      } else if (error.message.includes("Unsupported file type")) {
+        errorMessage = "File type not supported"
+        statusCode = 400
+      } else if (error.message.includes("No file provided")) {
+        errorMessage = "No file was provided"
+        statusCode = 400
+      } else {
+        errorMessage = error.message
+      }
+    }
+    
     return NextResponse.json({ 
-      error: "Upload failed", 
-      details: error instanceof Error ? error.message : "Unknown error",
-      suggestion: "Check server logs for more details"
+      error: errorMessage,
+      suggestion: "Please check the file size and type, then try again"
+    }, { status: statusCode })
+  }
+}
+
+// GET endpoint to retrieve uploaded files (for debugging)
+export async function GET() {
+  try {
+    const files = Array.from(global.uploadedFiles.values()).map(file => ({
+      id: file.id,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      uploadedAt: file.uploadedAt,
+      processed: file.processed
+    }))
+    
+    return NextResponse.json({
+      success: true,
+      files,
+      count: files.length
+    })
+  } catch (error) {
+    console.error("GET files error:", error)
+    return NextResponse.json({ 
+      error: "Failed to retrieve files" 
     }, { status: 500 })
   }
 }

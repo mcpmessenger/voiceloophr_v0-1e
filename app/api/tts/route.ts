@@ -8,21 +8,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing text or ElevenLabs key" }, { status: 400 })
     }
 
-    // In a real implementation, this would call ElevenLabs API
-    // For now, simulate TTS processing
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Validate text length (ElevenLabs has limits)
+    if (text.length > 5000) {
+      return NextResponse.json({ error: "Text too long. Maximum length is 5000 characters" }, { status: 400 })
+    }
 
-    // Simulate audio generation
-    const audioUrl = `/placeholder-audio.mp3?text=${encodeURIComponent(text.substring(0, 50))}`
+    // Get voice ID from environment or use default
+    const voiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
 
-    return NextResponse.json({
-      success: true,
-      audioUrl,
-      text: text.substring(0, 100) + (text.length > 100 ? "..." : ""),
-    })
-
-    /* Real implementation would be:
-    const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+    // Call ElevenLabs TTS API
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',
       headers: {
         'Accept': 'audio/mpeg',
@@ -40,17 +35,33 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      throw new Error('TTS generation failed')
+      const errorData = await response.json().catch(() => ({}))
+      const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`
+      throw new Error(`TTS generation failed: ${errorMessage}`)
     }
 
-    const audioBuffer = await response.arrayBuffer()
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' })
-    
-    // In a real app, you'd save this to storage and return a URL
-    return NextResponse.json({ success: true, audioUrl: 'generated-audio-url' })
-    */
+    // Check if we got audio content
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.includes('audio/')) {
+      throw new Error('Invalid response from ElevenLabs API - no audio content received')
+    }
+
+    // Stream the audio directly to the client
+    return new NextResponse(response.body, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Disposition': 'inline; filename="tts-audio.mp3"',
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+
   } catch (error) {
     console.error("TTS error:", error)
-    return NextResponse.json({ error: "TTS generation failed" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "TTS generation failed"
+    return NextResponse.json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error : undefined
+    }, { status: 500 })
   }
 }
