@@ -10,7 +10,8 @@ import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2 } from "lucide-react"
+import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2, Eye } from "lucide-react"
+import DocumentViewer from "@/components/DocumentViewer"
 
 interface UploadedFile {
   id: string
@@ -36,6 +37,9 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 export default function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [progressIntervals, setProgressIntervals] = useState<Map<string, NodeJS.Timeout>>(new Map())
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFileData, setSelectedFileData] = useState<any>(null)
   const router = useRouter()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -184,6 +188,12 @@ export default function UploadPage() {
 
       // Mark as completed
       setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "completed", progress: 100 } : f)))
+      
+      // Automatically redirect to results page after successful processing
+      toast.success("Document processed successfully! Redirecting to results...")
+      setTimeout(() => {
+        router.push(`/results/${uploadResult.fileId}`)
+      }, 1500)
     } catch (error) {
       console.error("File processing error:", error)
       let errorMessage = "Processing failed"
@@ -260,6 +270,104 @@ export default function UploadPage() {
     }
   }
 
+  const processWithPdfParse = async (fileId: string) => {
+    const fileToProcess = files.find((f) => f.id === fileId)
+    if (!fileToProcess || !fileToProcess.fileId) return
+
+    setFiles((prev) =>
+      prev.map((f) =>
+        f.id === fileId ? { ...f, status: "processing", progress: 50 } : f
+      )
+    )
+
+    try {
+      console.log(`🚀 Processing with PDF-Parse: ${fileToProcess.file.name}`)
+
+      // Use the Textract API with pdf-parse method
+      const response = await fetch('/api/textract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId: fileToProcess.fileId,
+          processingMethod: 'pdf-parse'
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.details || errorData.error || "PDF-Parse processing failed"
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+
+      // Save to localStorage
+      try {
+        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+        if (fileToProcess.fileId && existing[fileToProcess.fileId]) {
+          existing[fileToProcess.fileId] = {
+            ...existing[fileToProcess.fileId],
+            extractedText: result.extractedText,
+            wordCount: result.wordCount,
+            processed: true,
+            processingMethod: "pdf-parse",
+            processingTime: new Date().toISOString(),
+            metadata: {
+              ...(existing[fileToProcess.fileId]?.metadata || {}),
+              processingMethod: "pdf-parse",
+              confidence: result.confidence,
+              note: "Text extracted using pdf-parse"
+            }
+          }
+          localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+          console.log(`✅ Updated file ${fileToProcess.fileId} in localStorage with pdf-parse results`)
+        }
+      } catch (error) {
+        console.warn('Failed to update localStorage:', error)
+      }
+
+      // Update file with extracted content
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "completed", 
+            progress: 100,
+            warning: "Text extracted successfully using pdf-parse",
+            showTextractButton: false
+          } : f
+        )
+      )
+
+      toast.success(`Successfully extracted ${result.wordCount} words using pdf-parse! Redirecting to results...`)
+      
+      // Automatically redirect to results page after successful processing
+      setTimeout(() => {
+        router.push(`/results/${fileToProcess.fileId}`)
+      }, 1500)
+
+    } catch (error) {
+      console.error("PDF-Parse processing error:", error)
+      
+      const errorMessage = error instanceof Error ? error.message : "PDF-Parse processing failed. Please try again."
+      
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "error", 
+            error: errorMessage,
+            showTextractButton: true
+          } : f
+        )
+      )
+
+      toast(`Failed to extract text: ${errorMessage}`)
+    }
+  }
+
   const processWithTextract = async (fileId: string) => {
     const fileToProcess = files.find(f => f.id === fileId)
     if (!fileToProcess || !fileToProcess.fileId) return
@@ -284,35 +392,39 @@ export default function UploadPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Textract processing failed")
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.details || errorData.error || "Textract processing failed"
+        throw new Error(`Textract processing failed: ${errorMessage}`)
       }
 
       const result = await response.json()
 
-      // Save updated file data to localStorage
-      try {
-        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
-        if (existing[fileToProcess.fileId]) {
-          existing[fileToProcess.fileId] = {
-            ...existing[fileToProcess.fileId],
-            extractedText: result.extractedText,
-            wordCount: result.wordCount,
-            processed: true,
-            processingMethod: "textract",
-            processingTime: new Date().toISOString(),
-            metadata: {
-              ...existing[fileToProcess.fileId].metadata,
-              processingMethod: "textract",
-              confidence: 0.95,
-              note: "Text extracted using AWS Textract"
-            }
-          }
-          localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
-          console.log(`✅ Updated file ${fileToProcess.fileId} in localStorage with Textract results`)
-        }
-      } catch (error) {
-        console.warn('Failed to update localStorage:', error)
-      }
+             // Save updated file data to localStorage
+       try {
+         const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+         if (existing[fileToProcess.fileId]) {
+           existing[fileToProcess.fileId] = {
+             ...existing[fileToProcess.fileId],
+             extractedText: result.extractedText,
+             wordCount: result.wordCount,
+             processed: true,
+             processingMethod: result.processingMethod || "textract",
+             processingTime: new Date().toISOString(),
+             metadata: {
+               ...existing[fileToProcess.fileId].metadata,
+               processingMethod: result.processingMethod || "textract",
+               confidence: result.confidence || 0.95,
+               note: result.processingMethod === "textract" ? "Text extracted using AWS Textract" : 
+                     result.processingMethod === "pdf-parse" ? "Text extracted using pdf-parse" :
+                     "Text extracted using fallback method"
+             }
+           }
+           localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+           console.log(`✅ Updated file ${fileToProcess.fileId} in localStorage with ${result.processingMethod || "textract"} results`)
+         }
+       } catch (error) {
+         console.warn('Failed to update localStorage:', error)
+       }
 
       // Update file with extracted content
       setFiles((prev) =>
@@ -327,23 +439,30 @@ export default function UploadPage() {
         )
       )
 
-      toast(`Successfully extracted ${result.wordCount} words using AWS Textract`)
+      toast.success(`Successfully extracted ${result.wordCount} words using AWS Textract! Redirecting to results...`)
+      
+      // Automatically redirect to results page after successful Textract processing
+      setTimeout(() => {
+        router.push(`/results/${fileToProcess.fileId}`)
+      }, 1500)
 
     } catch (error) {
       console.error("Textract processing error:", error)
+      
+      const errorMessage = error instanceof Error ? error.message : "Textract processing failed. Please try again."
       
       setFiles((prev) =>
         prev.map((f) =>
           f.id === fileId ? { 
             ...f, 
             status: "error", 
-            error: "Textract processing failed. Please try again.",
+            error: errorMessage,
             showTextractButton: true
           } : f
         )
       )
 
-      toast("Failed to extract text. Please try again.")
+      toast(`Failed to extract text: ${errorMessage}`)
     }
   }
 
@@ -351,6 +470,16 @@ export default function UploadPage() {
     if (uploadedFile.fileId) {
       router.push(`/results/${uploadedFile.fileId}`)
     }
+  }
+
+  const openDocumentViewer = (uploadedFile: UploadedFile) => {
+    setSelectedFile(uploadedFile.file)
+    setSelectedFileData({
+      type: uploadedFile.file.type,
+      processed: uploadedFile.status === "completed",
+      processingMethod: uploadedFile.showTextractButton ? "pending" : "upload"
+    })
+    setDocumentViewerOpen(true)
   }
 
   const getFileIcon = (file: File) => {
@@ -515,28 +644,55 @@ export default function UploadPage() {
                           <>
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span className="text-sm text-green-600">Complete</span>
-                                                         {uploadedFile.warning && (
-                               <span className="text-sm text-yellow-600 ml-2">⚠️ {uploadedFile.warning}</span>
-                             )}
-                             {uploadedFile.showTextractButton && (
-                               <Button
-                                 size="sm"
-                                 variant="outline"
-                                 className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
-                                 onClick={() => processWithTextract(uploadedFile.id)}
-                               >
-                                 Process with Textract
-                               </Button>
-                             )}
-                             <Button
-                               size="sm"
-                               variant="outline"
-                               className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
-                               onClick={() => viewResults(uploadedFile)}
-                             >
-                               View Results
-                             </Button>
+                            {uploadedFile.warning && (
+                              <span className="text-sm text-yellow-600 ml-2">⚠️ {uploadedFile.warning}</span>
+                            )}
                           </>
+                        )}
+                        
+                        {/* Document Viewer Button - Available for all file states */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                          onClick={() => openDocumentViewer(uploadedFile)}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Document
+                        </Button>
+                        
+                        {/* Textract Button - Only for completed files that need processing */}
+                        {uploadedFile.status === "completed" && uploadedFile.showTextractButton && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                              onClick={() => processWithTextract(uploadedFile.id)}
+                            >
+                              Process with Textract
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                              onClick={() => processWithPdfParse(uploadedFile.id)}
+                            >
+                              Process with PDF-Parse
+                            </Button>
+                          </>
+                        )}
+                        
+                        {/* View Results Button - Only for completed files */}
+                        {uploadedFile.status === "completed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                            onClick={() => viewResults(uploadedFile)}
+                          >
+                            View Results
+                          </Button>
                         )}
                         {uploadedFile.status === "error" && (
                           <>
@@ -568,8 +724,16 @@ export default function UploadPage() {
               </Card>
             ))}
           </div>
-        )}
-      </div>
-    </div>
-  )
-}
+                 )}
+       </div>
+
+       {/* Document Viewer Modal */}
+       <DocumentViewer
+         file={selectedFile}
+         fileData={selectedFileData}
+         isOpen={documentViewerOpen}
+         onClose={() => setDocumentViewerOpen(false)}
+       />
+     </div>
+   )
+ }

@@ -145,8 +145,10 @@ export default function VoiceChat({ documentText, documentName, isOpen, onClose 
         throw new Error('OpenAI API key not configured')
       }
 
-             // Create context-aware prompt with FULL document content
-       const prompt = `You are an AI assistant helping a user understand a document called "${documentName}". 
+
+
+      // Create context-aware prompt with FULL document content
+      const prompt = `You are an AI assistant helping a user understand a document called "${documentName}". 
 
 IMPORTANT: You have access to the COMPLETE document content below. Use ALL available information to provide comprehensive, accurate answers.
 
