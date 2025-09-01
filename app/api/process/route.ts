@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     let summary = ""
 
     // Handle audio/video transcription if needed
-    if (fileData.type === "audio/wav" || fileData.type === "video/mp4") {
+    if (fileData.type === "audio/wav" || fileData.type === "audio/mpeg" || fileData.type === "audio/mp3" || fileData.name?.toLowerCase().endsWith('.wav') || fileData.name?.toLowerCase().endsWith('.mp3') || fileData.type === "video/mp4") {
       try {
         const buffer = Buffer.from(fileData.buffer, "base64")
         const transcriptionResult = await AIService.transcribeAudio(buffer, openaiKey, fileData.name)

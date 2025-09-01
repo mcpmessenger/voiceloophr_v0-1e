@@ -4,6 +4,7 @@ export async function POST(request: NextRequest) {
   try {
     const { message, fileId, openaiKey } = await request.json()
 
+    // Require both message and OpenAI key; prefer hard fail over simulation
     if (!message || !openaiKey) {
       return NextResponse.json({ error: "Missing message or OpenAI key" }, { status: 400 })
     }

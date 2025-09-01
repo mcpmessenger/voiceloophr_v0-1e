@@ -24,14 +24,14 @@ VoiceLoop HR now features **real-time speech-to-text and text-to-speech** powere
 
 ### **✅ Completed Features**
 - **File Upload System**: Drag & drop with multi-format support
-- **AWS Textract Integration**: PDF and image text extraction
-- **Smart Processing**: Automatic routing based on file type
-- **Cost Management**: User-controlled Textract usage ($0.0015/page)
+- **Free PDF Parser (Default)**: Robust text extraction using `pdf-parse` (internal entry import)
+- **Smart Processing**: Automatic routing based on file type (PDF/text vs audio)
 - **AI Analysis**: OpenAI integration for document summarization
 - **Voice Chat**: Interactive document queries with voice
+- **Whisper STT + ElevenLabs TTS**: Real voice in/out
 - **Search Interface**: Document search and retrieval
 - **Responsive UI**: Modern dark theme with Tailwind CSS
-- **STT/TTS Integration**: Real voice interaction capabilities
+- **Optional Textract**: AWS Textract can be enabled as a paid fallback
 
 ### **🔍 Research Phase**
 - **PDF Parsing Solutions**: Comprehensive evaluation of parsing libraries
@@ -61,7 +61,8 @@ VoiceLoop HR is an intelligent document processing platform that leverages AI to
 - **Modern UI**: Beautiful, responsive interface with Radix UI components
 
 ### 📄 **Document Processing**
-- **PDF Processing**: Enhanced with AWS Textract for enterprise-grade OCR
+- **PDF Processing (Default)**: Local extraction via `pdf-parse` with quality tuning
+- **Textract (Optional)**: Enterprise-grade OCR fallback when needed
 - **Form Recognition**: Automatic key-value pair extraction from forms
 - **Table Extraction**: Structured data conversion from complex tables
 - **DOCX Support**: Full Word document text extraction
@@ -104,15 +105,14 @@ VoiceLoop HR is an intelligent document processing platform that leverages AI to
 ### **Backend**
 - **Next.js API Routes**: Server-side API endpoints
 - **Node.js**: JavaScript runtime
-- **AWS Textract**: Enterprise-grade document analysis
-- **AWS S3**: Document storage and management
+- **Document Processing**: Multi-format extraction (PDF via pdf-parse; audio via Whisper)
 - **OpenAI Whisper**: Speech-to-text processing
 - **ElevenLabs**: Text-to-speech synthesis
-- **Document Processing**: Multi-format text extraction
 - **AI Integration**: OpenAI API services
+- **AWS Textract (optional)**: OCR fallback when configured
 
 ### **Development Tools**
-- **pnpm**: Fast package manager
+- **pnpm**: Fast package manager (Vercel uses `packageManager: pnpm@9`)
 - **ESLint**: Code quality and consistency
 - **TypeScript**: Static type checking
 - **PostCSS**: CSS processing
@@ -163,12 +163,16 @@ VoiceLoop HR is an intelligent document processing platform that leverages AI to
 ### **OpenAI API Key (Whisper STT)**
 1. Visit [OpenAI Platform](https://platform.openai.com/account/api-keys)
 2. Create new API key
-3. Add to `.env.local`: `OPENAI_API_KEY=sk-...`
+3. Either:
+   - Add to `.env.local`: `OPENAI_API_KEY=sk-...`, or
+   - Save in-app via Settings (stored in browser under `voiceloop_openai_key`)
 
 ### **ElevenLabs API Key (TTS)**
-1. Visit [ElevenLabs](https://elevenlabs.io/account/history)
+1. Visit [ElevenLabs](https://elevenlabs.io)
 2. Get your API key from account settings
-3. Add to `.env.local`: `ELEVENLABS_API_KEY=...`
+3. Either:
+   - Add to `.env.local`: `ELEVENLABS_API_KEY=...`, or
+   - Save in-app via Settings (`voiceloop_elevenlabs_key`)
 
 ### **Test Voice Features**
 1. Go to `/chat` page

@@ -30,6 +30,8 @@ export default function VoiceChat({ documentText, documentName, isOpen, onClose 
   const [isPlaying, setIsPlaying] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [autoplayBlocked, setAutoplayBlocked] = useState(false)
+  const [lastTranscription, setLastTranscription] = useState<string>("")
+  const [lastTranscriptionAt, setLastTranscriptionAt] = useState<number>(0)
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -153,7 +155,30 @@ export default function VoiceChat({ documentText, documentName, isOpen, onClose 
       }
 
       const result = await response.json()
-      const transcribedText = result.transcription || result.text
+      const transcribedText = (result.transcription || result.text || "").trim()
+
+      // Basic noise filtering: ignore too-short/low-signal phrases and common false positives
+      const normalized = transcribedText.toLowerCase()
+      const wordCount = normalized.split(/\s+/).filter(Boolean).length
+      const shortStoplist = new Set(["you", "test", "yeah", "uh", "um", "okay", "ok"])
+      const now = Date.now()
+      const isRepeat = normalized === lastTranscription.toLowerCase() && (now - lastTranscriptionAt) < 8000
+
+      if (!normalized || normalized.length < 5 || wordCount < 2 || shortStoplist.has(normalized) || isRepeat) {
+        // Surface a lightweight note in the thread but don't hit the AI
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'ai',
+          content: 'Heard very short or unclear audio. Please try again or speak a full question.',
+          timestamp: new Date()
+        }])
+        setLastTranscription(transcribedText)
+        setLastTranscriptionAt(now)
+        return
+      }
+
+      setLastTranscription(transcribedText)
+      setLastTranscriptionAt(now)
 
       // Add user message
       const userMessage: Message = {
@@ -230,7 +255,28 @@ Answer:`
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get AI response')
+        let detail = ''
+        try {
+          const errBody = await response.json()
+          detail = errBody?.error?.message || JSON.stringify(errBody)
+        } catch (_) {
+          try { detail = await response.text() } catch { detail = '' }
+        }
+        console.error('OpenAI chat error:', response.status, response.statusText, detail)
+        // Show a helpful, user-facing message
+        let friendly = 'Sorry, I could not reach the AI service.'
+        if (response.status === 401) {
+          friendly = 'OpenAI key is invalid or missing. Please update your key in Settings and try again.'
+        } else if (response.status === 429) {
+          friendly = 'OpenAI quota exceeded for this key. Please check your plan/billing or try again later.'
+        }
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'ai',
+          content: friendly,
+          timestamp: new Date()
+        }])
+        return
       }
 
       const result = await response.json()

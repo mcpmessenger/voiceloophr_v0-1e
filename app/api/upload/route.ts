@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       'application/pdf', 'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff',
-      'audio/wav', 'audio/mp3', 'audio/mpeg',
+      'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/x-wav',
       'video/mp4', 'video/avi', 'video/mov'
     ]
 
