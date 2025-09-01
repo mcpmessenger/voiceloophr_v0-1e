@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2, Eye } from "lucide-react"
+import DocumentViewer from "@/components/DocumentViewer"
 
 interface UploadedFile {
   id: string
@@ -17,7 +19,9 @@ interface UploadedFile {
   status: "uploading" | "processing" | "completed" | "error"
   progress: number
   error?: string
+  warning?: string
   fileId?: string
+  showTextractButton?: boolean
 }
 
 const ACCEPTED_FILE_TYPES = {
@@ -32,6 +36,10 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 
 export default function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([])
+  const [progressIntervals, setProgressIntervals] = useState<Map<string, NodeJS.Timeout>>(new Map())
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFileData, setSelectedFileData] = useState<any>(null)
   const router = useRouter()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -45,15 +53,29 @@ export default function UploadPage() {
     setFiles((prev) => [...prev, ...newFiles])
 
     newFiles.forEach((uploadedFile) => {
-      processFile(uploadedFile.id)
+      // Start progress simulation
+      const progressInterval = simulateProgress(uploadedFile.id)
+      if (progressInterval) {
+        setProgressIntervals(prev => new Map(prev).set(uploadedFile.id, progressInterval))
+      }
+      // Process file after a short delay to show progress
+      setTimeout(() => {
+        processFile(uploadedFile.id, uploadedFile)
+      }, 1000)
     })
   }, [])
 
-  const processFile = async (fileId: string) => {
-    const uploadedFile = files.find((f) => f.id === fileId)
+  const processFile = async (fileId: string, uploadedFile: UploadedFile) => {
     if (!uploadedFile) return
 
     try {
+      // Check API key availability first
+      const openaiKey = localStorage.getItem("voiceloop_openai_key")
+      if (!openaiKey) {
+        console.warn("OpenAI API key not found - file will be uploaded but not processed with AI")
+        // Continue with upload but mark for manual processing
+      }
+
       // Upload file
       const formData = new FormData()
       formData.append("file", uploadedFile.file)
@@ -64,10 +86,44 @@ export default function UploadPage() {
       })
 
       if (!uploadResponse.ok) {
-        throw new Error("Upload failed")
+        const errorData = await uploadResponse.json().catch(() => ({}))
+        const errorMessage = errorData.error || errorData.details || `Upload failed with status ${uploadResponse.status}`
+        throw new Error(errorMessage)
       }
 
       const uploadResult = await uploadResponse.json()
+
+      // Save to localStorage for persistence (client-side)
+      try {
+        const fileData = {
+          id: uploadResult.fileId,
+          name: uploadedFile.file.name,
+          type: uploadedFile.file.type,
+          size: uploadedFile.file.size,
+          buffer: "", // We don't need to store the full buffer in localStorage
+          uploadedAt: new Date().toISOString(),
+          processed: false,
+          processingError: null,
+          warnings: [],
+          extractedText: uploadResult.extractedText || "",
+          wordCount: uploadResult.wordCount || 0,
+          pages: 1,
+          metadata: {
+            processingVersion: "1.0.0",
+            processingMethod: "upload",
+            confidence: 0.8,
+            note: "File uploaded successfully"
+          }
+        }
+        
+        // Save to localStorage
+        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+        existing[uploadResult.fileId] = fileData
+        localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+        console.log(`✅ File ${uploadResult.fileId} saved to localStorage`)
+      } catch (error) {
+        console.warn('Failed to save to localStorage:', error)
+      }
 
       // Update with file ID from server
       setFiles((prev) =>
@@ -76,13 +132,188 @@ export default function UploadPage() {
         ),
       )
 
-      // Get OpenAI key from localStorage
-      const openaiKey = localStorage.getItem("voiceloop_openai_key")
+      // Add a small delay to show processing status
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Check if we have the OpenAI key for AI processing
       if (!openaiKey) {
-        throw new Error("OpenAI API key not configured. Please add it in Settings.")
+        // Mark as completed without AI processing if no key
+        setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+          ...f, 
+          status: "completed", 
+          progress: 100,
+          warning: "File uploaded successfully but AI processing skipped - OpenAI API key not configured"
+        } : f))
+        
+        // Show user-friendly message
+        toast("File was uploaded and processed, but AI analysis was skipped because OpenAI API key is not configured. You can configure it in Settings.")
+        return
       }
 
-      // Process file with AI
+                     // For PDFs, automatically process with our fixed PDF parser
+        if (uploadedFile.file.type.includes('pdf')) {
+          try {
+            console.log(`🚀 Auto-processing PDF with Fixed PDF Parser: ${uploadedFile.file.name}`)
+            
+            // Add a small delay to ensure server has processed the upload
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            
+            // Try auto-processing with retry mechanism
+            let processingSuccess = false
+            let retryCount = 0
+            const maxRetries = 2
+            
+            while (!processingSuccess && retryCount < maxRetries) {
+              try {
+                console.log(`🔄 Attempt ${retryCount + 1} of ${maxRetries + 1} for auto-processing`)
+                
+                // Process PDF automatically
+                const response = await fetch('/api/textract', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    fileId: uploadResult.fileId,
+                    processingMethod: 'fixed-pdf-parser'
+                  })
+                })
+
+                if (response.ok) {
+                  const result = await response.json()
+                  
+                  // Update localStorage
+                  try {
+                    const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+                    if (existing[uploadResult.fileId]) {
+                      existing[uploadResult.fileId] = {
+                        ...existing[uploadResult.fileId],
+                        extractedText: result.extractedText,
+                        wordCount: result.wordCount,
+                        processed: true,
+                        processingMethod: "fixed-pdf-parser",
+                        processingTime: new Date().toISOString(),
+                        metadata: {
+                          ...existing[uploadResult.fileId].metadata,
+                          processingMethod: "fixed-pdf-parser",
+                          confidence: result.confidence,
+                          note: "Text extracted using fixed PDF parser (free)"
+                        }
+                      }
+                      localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+                    }
+                  } catch (error) {
+                    console.warn('Failed to update localStorage:', error)
+                  }
+                  
+                  setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+                    ...f, 
+                    status: "completed", 
+                    progress: 100,
+                    warning: `Text extracted successfully using fixed PDF parser (free) - ${result.wordCount} words`,
+                    showTextractButton: false
+                  } : f))
+                  
+                  toast.success(`PDF processed successfully! Extracted ${result.wordCount} words using fixed PDF parser (free).`)
+                  
+                  // Automatically redirect to results
+                  setTimeout(() => {
+                    router.push(`/results/${uploadResult.fileId}`)
+                  }, 1500)
+                  
+                  processingSuccess = true
+                  
+                } else {
+                  const errorData = await response.json().catch(() => ({}))
+                  const errorMessage = errorData.details || errorData.error || "Processing failed"
+                  
+                  // If it's a "File not found" error, try re-uploading
+                  if (errorMessage.includes('File not found') || errorMessage.includes('server restart')) {
+                    console.log(`📤 File not found, attempting re-upload on attempt ${retryCount + 1}`)
+                    
+                    // Re-upload the file
+                    const reUploadFormData = new FormData()
+                    reUploadFormData.append('file', uploadedFile.file)
+                    
+                    const reUploadResponse = await fetch('/api/upload', {
+                      method: 'POST',
+                      body: reUploadFormData
+                    })
+                    
+                    if (reUploadResponse.ok) {
+                      const reUploadResult = await reUploadResponse.json()
+                      uploadResult.fileId = reUploadResult.fileId // Update the fileId
+                      
+                      // Wait a bit before trying to process again
+                      await new Promise(resolve => setTimeout(resolve, 2000))
+                      retryCount++
+                      continue
+                    }
+                  }
+                  
+                  // If it's not a file not found error, break the retry loop
+                  break
+                }
+                
+              } catch (retryError) {
+                console.error(`Retry ${retryCount + 1} failed:`, retryError)
+                retryCount++
+                
+                if (retryCount < maxRetries) {
+                  // Wait before next retry
+                  await new Promise(resolve => setTimeout(resolve, 2000))
+                }
+              }
+            }
+            
+            // If all retries failed, fallback to manual processing
+            if (!processingSuccess) {
+              console.log('🔄 All auto-processing attempts failed, falling back to manual processing')
+              setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+                ...f, 
+                status: "completed", 
+                progress: 100,
+                warning: "Auto-processing failed. Choose your preferred method below.",
+                showTextractButton: true
+              } : f))
+              
+              toast("PDF uploaded. Auto-processing failed - please choose your preferred method below.")
+            }
+            
+          } catch (error) {
+            console.error("Auto PDF processing failed:", error)
+            // Fallback to manual processing with both options
+            setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+              ...f, 
+              status: "completed", 
+              progress: 100,
+              warning: "Auto-processing failed. Choose your preferred method below.",
+              showTextractButton: true
+            } : f))
+            
+            toast("PDF uploaded. Auto-processing failed - please choose your preferred method below.")
+          }
+          return
+        }
+        
+        // For images, we need to extract text first before AI processing
+        if (uploadedFile.file.type.includes('image')) {
+          setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+            ...f, 
+            status: "completed", 
+            progress: 100,
+            warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
+            showTextractButton: true
+          } : f))
+          
+          toast("Image uploaded. Click 'Process with Textract' to extract text content.")
+          return
+        }
+
+      // Process file with AI with timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
       const processResponse = await fetch("/api/process", {
         method: "POST",
         headers: {
@@ -92,7 +323,10 @@ export default function UploadPage() {
           fileId: uploadResult.fileId,
           openaiKey,
         }),
+        signal: controller.signal,
       })
+      
+      clearTimeout(timeoutId)
 
       if (!processResponse.ok) {
         throw new Error("Processing failed")
@@ -100,15 +334,31 @@ export default function UploadPage() {
 
       // Mark as completed
       setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "completed", progress: 100 } : f)))
+      
+      // Automatically redirect to results page after successful processing
+      toast.success("Document processed successfully! Redirecting to results...")
+      setTimeout(() => {
+        router.push(`/results/${uploadResult.fileId}`)
+      }, 1500)
     } catch (error) {
       console.error("File processing error:", error)
+      let errorMessage = "Processing failed"
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = "Processing timed out. Please try again."
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
       setFiles((prev) =>
         prev.map((f) =>
           f.id === fileId
             ? {
                 ...f,
                 status: "error",
-                error: error instanceof Error ? error.message : "Processing failed",
+                error: errorMessage,
               }
             : f,
         ),
@@ -119,7 +369,7 @@ export default function UploadPage() {
   const simulateProgress = (fileId: string) => {
     let progress = 0
     const interval = setInterval(() => {
-      progress += Math.random() * 10
+      progress += Math.random() * 15
 
       setFiles((prev) =>
         prev.map((file) => {
@@ -133,11 +383,316 @@ export default function UploadPage() {
           return file
         }),
       )
-    }, 200)
+    }, 150)
+
+    // Store interval reference for cleanup
+    return interval
   }
 
   const removeFile = (fileId: string) => {
+    // Clear progress interval if it exists
+    const interval = progressIntervals.get(fileId)
+    if (interval) {
+      clearInterval(interval)
+      setProgressIntervals(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(fileId)
+        return newMap
+      })
+    }
     setFiles((prev) => prev.filter((file) => file.id !== fileId))
+  }
+
+  const retryFile = (fileId: string) => {
+    const fileToRetry = files.find(f => f.id === fileId)
+    if (fileToRetry) {
+      // Reset status and retry
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { ...f, status: "uploading", progress: 0, error: undefined } : f
+        )
+      )
+      processFile(fileId, fileToRetry)
+    }
+  }
+
+  const processWithPdfParse = async (fileId: string) => {
+    const fileToProcess = files.find((f) => f.id === fileId)
+    if (!fileToProcess || !fileToProcess.fileId) return
+
+    setFiles((prev) =>
+      prev.map((f) =>
+        f.id === fileId ? { ...f, status: "processing", progress: 50 } : f
+      )
+    )
+
+    try {
+      console.log(`🚀 Processing with Fixed PDF Parser: ${fileToProcess.file.name}`)
+
+      // Use the Textract API with fixed PDF parser method
+      const response = await fetch('/api/textract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId: fileToProcess.fileId,
+          processingMethod: 'fixed-pdf-parser'
+        })
+      })
+
+             if (!response.ok) {
+         const errorData = await response.json().catch(() => ({}))
+         const errorMessage = errorData.details || errorData.error || "Fixed PDF Parser processing failed"
+         
+         // If file not found, it might be due to server restart - try uploading again
+         if (errorMessage.includes("File not found") || errorMessage.includes("server restart")) {
+           console.log("🔄 File not found - likely server restart. Retrying with re-upload...")
+           
+           // Try to re-upload the file first
+           const reUploadFormData = new FormData()
+           reUploadFormData.append("file", fileToProcess.file)
+           
+           const reUploadResponse = await fetch("/api/upload", {
+             method: "POST",
+             body: reUploadFormData,
+           })
+           
+           if (reUploadResponse.ok) {
+             const reUploadResult = await reUploadResponse.json()
+             
+             // Update the file ID and try processing again
+             fileToProcess.fileId = reUploadResult.fileId
+             
+             // Try processing again with new file ID
+             const retryResponse = await fetch('/api/textract', {
+               method: 'POST',
+               headers: {
+                 'Content-Type': 'application/json',
+               },
+               body: JSON.stringify({
+                 fileId: reUploadResult.fileId,
+                 processingMethod: 'fixed-pdf-parser'
+               })
+             })
+             
+             if (retryResponse.ok) {
+               const retryResult = await retryResponse.json()
+               
+               // Update localStorage with new file ID
+               try {
+                 const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+                 existing[reUploadResult.fileId] = {
+                   ...existing[fileToProcess.fileId || ''],
+                   id: reUploadResult.fileId,
+                   extractedText: retryResult.extractedText,
+                   wordCount: retryResult.wordCount,
+                   processed: true,
+                   processingMethod: "fixed-pdf-parser",
+                   processingTime: new Date().toISOString(),
+                   metadata: {
+                     processingMethod: "fixed-pdf-parser",
+                     confidence: retryResult.confidence,
+                     note: "Text extracted using fixed PDF parser (free) - retry successful"
+                   }
+                 }
+                 localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+               } catch (error) {
+                 console.warn('Failed to update localStorage:', error)
+               }
+               
+               // Update file with extracted content
+               setFiles((prev) =>
+                 prev.map((f) =>
+                   f.id === fileId ? { 
+                     ...f, 
+                     fileId: reUploadResult.fileId,
+                     status: "completed", 
+                     progress: 100,
+                     warning: `Text extracted successfully using fixed PDF parser (free) - ${retryResult.wordCount} words`,
+                     showTextractButton: false
+                   } : f
+                 )
+               )
+               
+               toast.success(`PDF processed successfully! Extracted ${retryResult.wordCount} words using fixed PDF parser (free).`)
+               
+               // Automatically redirect to results
+               setTimeout(() => {
+                 router.push(`/results/${reUploadResult.fileId}`)
+               }, 1500)
+               
+               return // Success - exit early
+             }
+           }
+         }
+         
+         throw new Error(errorMessage)
+       }
+
+      const result = await response.json()
+
+      // Save to localStorage
+      try {
+        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+        if (fileToProcess.fileId && existing[fileToProcess.fileId]) {
+          existing[fileToProcess.fileId] = {
+            ...existing[fileToProcess.fileId],
+            extractedText: result.extractedText,
+            wordCount: result.wordCount,
+            processed: true,
+            processingMethod: "fixed-pdf-parser",
+            processingTime: new Date().toISOString(),
+            metadata: {
+              ...(existing[fileToProcess.fileId]?.metadata || {}),
+              processingMethod: "fixed-pdf-parser",
+              confidence: result.confidence,
+              note: "Text extracted using fixed PDF parser (free)"
+            }
+          }
+          localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+          console.log(`✅ Updated file ${fileToProcess.fileId} in localStorage with fixed PDF parser results`)
+        }
+      } catch (error) {
+        console.warn('Failed to update localStorage:', error)
+      }
+
+      // Update file with extracted content
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "completed", 
+            progress: 100,
+            warning: "Text extracted successfully using fixed PDF parser (free)",
+            showTextractButton: false
+          } : f
+        )
+      )
+
+      toast.success(`Successfully extracted ${result.wordCount} words using fixed PDF parser (free)! Redirecting to results...`)
+      
+      // Automatically redirect to results page after successful processing
+      setTimeout(() => {
+        router.push(`/results/${fileToProcess.fileId}`)
+      }, 1500)
+
+    } catch (error) {
+      console.error("Fixed PDF Parser processing error:", error)
+      
+      const errorMessage = error instanceof Error ? error.message : "Fixed PDF Parser processing failed. Please try again."
+      
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "error", 
+            error: errorMessage,
+            showTextractButton: true
+          } : f
+        )
+      )
+
+      toast(`Failed to extract text: ${errorMessage}`)
+    }
+  }
+
+  const processWithTextract = async (fileId: string) => {
+    const fileToProcess = files.find(f => f.id === fileId)
+    if (!fileToProcess || !fileToProcess.fileId) return
+
+    try {
+      // Update status to processing
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { ...f, status: "processing", progress: 50 } : f
+        )
+      )
+
+      // Call Textract API
+      const response = await fetch("/api/textract", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileId: fileToProcess.fileId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.details || errorData.error || "Textract processing failed"
+        throw new Error(`Textract processing failed: ${errorMessage}`)
+      }
+
+      const result = await response.json()
+
+             // Save updated file data to localStorage
+       try {
+         const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+         if (existing[fileToProcess.fileId]) {
+           existing[fileToProcess.fileId] = {
+             ...existing[fileToProcess.fileId],
+             extractedText: result.extractedText,
+             wordCount: result.wordCount,
+             processed: true,
+             processingMethod: result.processingMethod || "textract",
+             processingTime: new Date().toISOString(),
+             metadata: {
+               ...existing[fileToProcess.fileId].metadata,
+               processingMethod: result.processingMethod || "textract",
+               confidence: result.confidence || 0.95,
+               note: result.processingMethod === "textract" ? "Text extracted using AWS Textract" : 
+                     result.processingMethod === "fixed-pdf-parser" ? "Text extracted using fixed PDF parser (free)" :
+                     "Text extracted using fallback method"
+             }
+           }
+           localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+           console.log(`✅ Updated file ${fileToProcess.fileId} in localStorage with ${result.processingMethod || "textract"} results`)
+         }
+       } catch (error) {
+         console.warn('Failed to update localStorage:', error)
+       }
+
+      // Update file with extracted content
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "completed", 
+            progress: 100,
+            warning: "Text extracted successfully using AWS Textract",
+            showTextractButton: false
+          } : f
+        )
+      )
+
+      toast.success(`Successfully extracted ${result.wordCount} words using AWS Textract! Redirecting to results...`)
+      
+      // Automatically redirect to results page after successful Textract processing
+      setTimeout(() => {
+        router.push(`/results/${fileToProcess.fileId}`)
+      }, 1500)
+
+    } catch (error) {
+      console.error("Textract processing error:", error)
+      
+      const errorMessage = error instanceof Error ? error.message : "Textract processing failed. Please try again."
+      
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { 
+            ...f, 
+            status: "error", 
+            error: errorMessage,
+            showTextractButton: true
+          } : f
+        )
+      )
+
+      toast(`Failed to extract text: ${errorMessage}`)
+    }
   }
 
   const viewResults = (uploadedFile: UploadedFile) => {
@@ -146,11 +701,21 @@ export default function UploadPage() {
     }
   }
 
+  const openDocumentViewer = (uploadedFile: UploadedFile) => {
+    setSelectedFile(uploadedFile.file)
+    setSelectedFileData({
+      type: uploadedFile.file.type,
+      processed: uploadedFile.status === "completed",
+      processingMethod: uploadedFile.showTextractButton ? "pending" : "upload"
+    })
+    setDocumentViewerOpen(true)
+  }
+
   const getFileIcon = (file: File) => {
-    if (file.type.includes("pdf")) return <FileText className="h-6 w-6" />
-    if (file.type.includes("audio")) return <Music className="h-6 w-6" />
-    if (file.type.includes("video")) return <Video className="h-6 w-6" />
-    return <File className="h-6 w-6" />
+    if (file.type.includes("pdf")) return <FileText className="h-6 w-6 text-red-500 drop-shadow-sm" />
+    if (file.type.includes("audio")) return <Music className="h-6 w-6 text-blue-500 drop-shadow-sm" />
+    if (file.type.includes("video")) return <Video className="h-6 w-6 text-purple-500 drop-shadow-sm" />
+    return <File className="h-6 w-6 text-primary drop-shadow-sm" />
   }
 
   const getStatusColor = (status: UploadedFile["status"]) => {
@@ -168,6 +733,13 @@ export default function UploadPage() {
     }
   }
 
+  // Cleanup progress intervals when component unmounts
+  useEffect(() => {
+    return () => {
+      progressIntervals.forEach(interval => clearInterval(interval))
+    }
+  }, [progressIntervals])
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: ACCEPTED_FILE_TYPES,
@@ -178,7 +750,7 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-thin border-border/50">
+      <header className="border-b-2 border-primary/20 bg-gradient-to-r from-background to-primary/5">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -188,12 +760,12 @@ export default function UploadPage() {
               </Link>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
+              <Button variant="outline" size="sm" className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md" asChild>
                 <Link href="/settings">Settings</Link>
               </Button>
-              <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
+              <Button variant="outline" size="sm" className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md" asChild>
                 <Link href="/">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  <ArrowLeft className="mr-2 h-4 w-4 text-primary" />
                   Back to Home
                 </Link>
               </Button>
@@ -214,13 +786,13 @@ export default function UploadPage() {
         <Card className="mb-8">
           <div
             {...getRootProps()}
-            className={`p-12 border-2 border-dashed rounded-lg transition-colors cursor-pointer ${
-              isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+            className={`p-12 border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${
+              isDragActive ? "border-primary bg-primary/5 shadow-lg" : "border-primary/30 hover:border-primary/50 bg-gradient-to-br from-background to-primary/5"
             }`}
           >
             <input {...getInputProps()} />
             <div className="text-center">
-              <Upload className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <Upload className="h-16 w-16 text-primary mx-auto mb-4 drop-shadow-lg" />
               {isDragActive ? (
                 <p className="text-lg font-light text-primary">Drop your files here...</p>
               ) : (
@@ -241,9 +813,29 @@ export default function UploadPage() {
         {files.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-2xl font-light text-foreground mb-4">Processing Files ({files.length})</h2>
+            
+            {/* API Key Status */}
+            {!localStorage.getItem("voiceloop_openai_key") && (
+              <Card className="p-4 border-2 border-yellow-200 bg-yellow-50">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-yellow-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800">
+                      OpenAI API Key Not Configured
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      Files will be uploaded and processed, but AI analysis will be skipped. 
+                      <Link href="/settings" className="text-yellow-800 underline ml-1 hover:text-yellow-900">
+                        Configure API key in Settings
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             {files.map((uploadedFile) => (
-              <Card key={uploadedFile.id} className="p-6">
+                             <Card key={uploadedFile.id} className="p-6 border-2 border-primary/20 hover:border-primary/30 transition-colors duration-200 shadow-sm hover:shadow-md">
                 <div className="flex items-center gap-4">
                   <div className="text-muted-foreground">{getFileIcon(uploadedFile.file)}</div>
 
@@ -253,6 +845,11 @@ export default function UploadPage() {
                       <Badge variant="secondary" className="text-xs">
                         {(uploadedFile.file.size / 1024 / 1024).toFixed(1)} MB
                       </Badge>
+                      {uploadedFile.fileId && (
+                        <Badge variant="outline" className="text-xs">
+                          {uploadedFile.file.type.split("/")[1]?.toUpperCase() || "FILE"}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -267,27 +864,77 @@ export default function UploadPage() {
                         {uploadedFile.status === "processing" && (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
-                            <span className="text-sm text-muted-foreground">Processing with AI...</span>
+                            <span className="text-sm text-muted-foreground">
+                              {uploadedFile.fileId ? "Processing with AI..." : "Uploading..."}
+                            </span>
                           </>
                         )}
                         {uploadedFile.status === "completed" && (
                           <>
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span className="text-sm text-green-600">Complete</span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="ml-2 font-light bg-transparent"
-                              onClick={() => viewResults(uploadedFile)}
-                            >
-                              View Results
-                            </Button>
+                            {uploadedFile.warning && (
+                              <span className="text-sm text-yellow-600 ml-2">⚠️ {uploadedFile.warning}</span>
+                            )}
                           </>
+                        )}
+                        
+                        {/* Document Viewer Button - Available for all file states */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                          onClick={() => openDocumentViewer(uploadedFile)}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Document
+                        </Button>
+                        
+                                                 {/* Processing Options - Only for completed files that need processing */}
+                         {uploadedFile.status === "completed" && uploadedFile.showTextractButton && (
+                           <>
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                               onClick={() => processWithPdfParse(uploadedFile.id)}
+                             >
+                               🆓 Free PDF Parser
+                             </Button>
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                               onClick={() => processWithTextract(uploadedFile.id)}
+                             >
+                               💰 AWS Textract (Paid)
+                             </Button>
+                           </>
+                         )}
+                        
+                        {/* View Results Button - Only for completed files */}
+                        {uploadedFile.status === "completed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                            onClick={() => viewResults(uploadedFile)}
+                          >
+                            View Results
+                          </Button>
                         )}
                         {uploadedFile.status === "error" && (
                           <>
                             <AlertCircle className="h-4 w-4 text-red-500" />
                             <span className="text-sm text-red-600">{uploadedFile.error || "Error"}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
+                              onClick={() => retryFile(uploadedFile.id)}
+                            >
+                              Retry
+                            </Button>
                           </>
                         )}
                       </div>
@@ -306,8 +953,16 @@ export default function UploadPage() {
               </Card>
             ))}
           </div>
-        )}
-      </div>
-    </div>
-  )
-}
+                 )}
+       </div>
+
+       {/* Document Viewer Modal */}
+       <DocumentViewer
+         file={selectedFile}
+         fileData={selectedFileData}
+         isOpen={documentViewerOpen}
+         onClose={() => setDocumentViewerOpen(false)}
+       />
+     </div>
+   )
+ }
