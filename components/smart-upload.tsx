@@ -27,7 +27,7 @@ export default function SmartUpload() {
     status: 'Ready to upload'
   });
   
-  const [useTextract, setUseTextract] = useState(false);
+  const [useTextract, setUseTextract] = useState(false); // Disabled by default - use our free PDF parser
   const [forceTextract, setForceTextract] = useState(false);
   const [showCostWarning, setShowCostWarning] = useState(false);
   const [documentAnalysis, setDocumentAnalysis] = useState<DocumentAnalysis | null>(null);
@@ -69,8 +69,8 @@ export default function SmartUpload() {
       pages = Math.max(1, Math.ceil(sizeInMB));
     } else if (fileExtension === 'pdf') {
       type = 'PDF Document';
-      estimatedCost = 0.0015; // $0.0015 per page
-      recommendedProcessing = 'user-choice';
+      estimatedCost = 0; // Free with our fixed PDF parser
+      recommendedProcessing = 'direct';
       pages = Math.max(1, Math.ceil(sizeInMB));
     } else {
       type = 'Unknown Format';
@@ -138,7 +138,7 @@ export default function SmartUpload() {
     if (!documentAnalysis) return 'Unknown';
     
     if (documentAnalysis.recommendedProcessing === 'direct') {
-      return 'Direct Processing (Free)';
+      return 'Fixed PDF Parser (Free)';
     }
     
     if (useTextract || forceTextract) {
@@ -168,7 +168,7 @@ export default function SmartUpload() {
         <CardHeader>
           <CardTitle>Smart Document Upload</CardTitle>
           <CardDescription>
-            Intelligent document processing with cost-effective Textract integration
+            Intelligent document processing with free PDF parser and optional Textract integration
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

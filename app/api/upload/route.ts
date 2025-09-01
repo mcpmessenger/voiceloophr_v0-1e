@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { TextractClient, DetectDocumentTextCommand } from '@aws-sdk/client-textract'
 
 // Use global storage to match the process API route
 declare global {
@@ -8,10 +7,10 @@ declare global {
 
 if (!global.uploadedFiles) {
   global.uploadedFiles = new Map()
+  console.log('🔧 Global storage initialized')
 }
 
-// Initialize Textract client
-const textractClient = new TextractClient({ region: 'us-east-1' })
+// Textract client removed - using fixed PDF parser instead
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,18 +75,24 @@ export async function POST(request: NextRequest) {
         wordCount = 0
       }
     } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      // Use Textract for PDF files ($0.0015 per page)
+      // Use our fixed PDF parser (FREE)
       try {
-        console.log(`Processing PDF with Textract: ${file.name}`)
+        console.log(`Processing PDF with Fixed PDF Parser: ${file.name}`)
         
-        // For now, we'll store the PDF buffer and mark it for Textract processing
-        // In a production app, you'd upload to S3 first, then call Textract
-        extractedText = "[PDF content - Textract processing required]"
-        wordCount = 0
-        processingMethod = "textract"
-        console.log(`PDF marked for Textract processing`)
-      } catch (textractError) {
-        console.warn(`Textract processing failed for ${file.name}:`, textractError)
+        // Import and use our minimal PDF parser
+        const { MinimalPDFParser } = require('../../../lib/pdf-parser-minimal.js')
+        const pdfResult = await MinimalPDFParser.parsePDF(buffer)
+        
+        if (pdfResult.hasErrors) {
+          throw new Error(`PDF parsing failed: ${pdfResult.errors?.join(', ')}`)
+        }
+        
+        extractedText = pdfResult.text
+        wordCount = pdfResult.wordCount
+        processingMethod = "pdf-parse-fixed"
+        console.log(`PDF processed successfully: ${wordCount} words, confidence: ${(pdfResult.confidence * 100).toFixed(1)}%`)
+      } catch (pdfError) {
+        console.warn(`Fixed PDF parsing failed for ${file.name}:`, pdfError)
         extractedText = ""
         wordCount = 0
         processingMethod = "basic"
@@ -132,10 +137,12 @@ export async function POST(request: NextRequest) {
       
       // Metadata
       metadata: {
-        processingVersion: "1.0.0",
+        processingVersion: "2.0.0",
         processingMethod: processingMethod,
-        confidence: processingMethod === "direct" ? 1.0 : 0.5,
+        confidence: processingMethod === "direct" ? 1.0 : 
+                   processingMethod === "pdf-parse-fixed" ? 1.0 : 0.5,
         note: processingMethod === "direct" ? "Text extracted during upload" : 
+              processingMethod === "pdf-parse-fixed" ? "PDF processed with fixed parser" :
               processingMethod === "textract" ? "File uploaded, Textract processing required" :
               "File uploaded successfully, ready for processing"
       }
@@ -143,6 +150,8 @@ export async function POST(request: NextRequest) {
 
     // Store in global memory
     global.uploadedFiles.set(fileId, fileData)
+    console.log(`✅ File stored in global memory: ${fileId} (${file.name})`)
+    console.log(`📊 Total files in global storage: ${global.uploadedFiles.size}`)
     
     // Note: localStorage will be handled client-side after successful upload
     

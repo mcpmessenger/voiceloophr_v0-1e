@@ -21,6 +21,7 @@ interface ProcessedFile {
   summary: string
   transcription?: string
   processedAt: string
+  processingMethod?: string
 }
 
 export default function ResultsPage() {
@@ -86,6 +87,7 @@ export default function ResultsPage() {
             summary: await generateAISummary(fileData.extractedText, fileData.name),
             transcription: fileData.transcription,
             processedAt: fileData.processingTime || fileData.uploadedAt || new Date().toISOString(),
+            processingMethod: fileData.processingMethod || fileData?.metadata?.processingMethod || 'fixed-pdf-parser',
           }
 
           setFileData(realData)
@@ -103,6 +105,7 @@ export default function ResultsPage() {
             summary: `**Document Summary: ${fileData.name}**\n\n**Status:** Document processed with limited content\n\n**Note:** This document was processed but contains limited or fallback content. Please try uploading a different version of the document.`,
             transcription: fileData.transcription,
             processedAt: fileData.processingTime || fileData.uploadedAt || new Date().toISOString(),
+            processingMethod: fileData.processingMethod || fileData?.metadata?.processingMethod,
           }
 
           setFileData(fallbackData)
@@ -133,7 +136,7 @@ export default function ResultsPage() {
     }
 
     try {
-      const openaiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || localStorage.getItem('openai_api_key')
+      const openaiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || localStorage.getItem('voiceloop_openai_key')
       
       if (openaiKey) {
         console.log('🚀 Attempting OpenAI analysis...')
@@ -205,7 +208,7 @@ export default function ResultsPage() {
     }
 
     // Production: Only OpenAI analysis, no fallbacks
-    return `**Document Summary: ${fileName}**\n\n**Status: AI Analysis Required**\n\n**Current State:**\n• Document text extracted successfully via AWS Textract\n• AI analysis pending - OpenAI API key required\n\n**Next Steps:**\n• Configure OpenAI API key in Settings\n• Re-process document for AI insights\n• Contact administrator if issues persist\n\n**Note:** This is a production system requiring OpenAI integration for document analysis.`
+    return `**Document Summary: ${fileName}**\n\n**Status: AI Analysis Optional**\n\n**Current State:**\n• Document text extracted successfully using Free PDF Parser\n• AI insights pending (requires OpenAI API key)\n\n**Next Steps:**\n• Add OpenAI API key in Settings (optional)\n• Re-run AI analysis for summaries and insights\n\n**Note:** PDF text extraction does not require any API key.`
   }
 
   const copyToClipboard = async (text: string) => {
@@ -343,12 +346,12 @@ export default function ResultsPage() {
               </div>
             </div>
             
-            {/* Textract Processing Details */}
+            {/* Processing Details */}
             {fileData.extractedText && (
               <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-primary">Textract Processing Complete</span>
+                  <span className="text-sm font-medium text-primary">Processing Complete</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                   <div>
@@ -366,13 +369,7 @@ export default function ResultsPage() {
                   <div>
                     <span className="text-muted-foreground">Processing:</span>
                     <span className="ml-2 font-medium text-foreground">
-                      textract
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Confidence:</span>
-                    <span className="ml-2 font-medium text-foreground">
-                      95%
+                      {fileData.processingMethod === 'fixed-pdf-parser' ? 'Free PDF Parser' : (fileData.processingMethod || '—')}
                     </span>
                   </div>
                 </div>
@@ -427,13 +424,13 @@ export default function ResultsPage() {
                   Copy Text
                 </Button>
               </div>
-              <div className="text-sm font-light leading-relaxed text-muted-foreground max-h-96 overflow-y-auto">
+              <div className="text-sm font-light leading-relaxed text-muted-foreground whitespace-pre-wrap">
                 {fileData.extractedText}
               </div>
             </Card>
 
-            {/* OpenAI Settings - Only show if no API key configured */}
-            {typeof window !== 'undefined' && !localStorage.getItem('openai_api_key') && (
+            {/* OpenAI Settings - Only show if user opens voice chat and no key configured */}
+            {typeof window !== 'undefined' && isVoiceChatOpen && !localStorage.getItem('voiceloop_openai_key') && (
               <OpenAISettings />
             )}
 
