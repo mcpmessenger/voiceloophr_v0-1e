@@ -32,6 +32,7 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
   const [audioChunks, setAudioChunks] = useState<Blob[]>([])
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
   const [audioProgress, setAudioProgress] = useState(0)
+  const [pendingAudioUrl, setPendingAudioUrl] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -241,18 +242,27 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
 
       // Handle audio streaming response
       const audioBlob = await response.blob()
+      console.log("TTS blob size(bytes):", audioBlob.size)
       const audioUrl = URL.createObjectURL(audioBlob)
       
       // Create and play audio
       const audio = new Audio(audioUrl)
+      audio.preload = "auto"
+      audio.muted = false
+      audio.volume = 1
       setCurrentAudio(audio)
-      
-      audio.onloadedmetadata = () => {
+
+      const tryPlay = () => {
         audio.play().catch((error) => {
           console.error("Audio playback failed:", error)
+          // Autoplay likely blocked → show manual player fallback
+          setPendingAudioUrl(audioUrl)
           setIsSpeaking(false)
         })
       }
+
+      audio.onloadedmetadata = tryPlay
+      audio.oncanplaythrough = tryPlay
 
       audio.ontimeupdate = () => {
         if (audio.duration) {
@@ -299,6 +309,26 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
       setIsSpeaking(false)
       setAudioProgress(0)
       setCurrentAudio(null)
+    }
+  }
+
+  const playAudio = () => {
+    // Retry playing current audio or pending URL
+    if (currentAudio) {
+      currentAudio.play().catch((error) => {
+        console.error("Manual play failed:", error)
+      })
+      return
+    }
+    if (pendingAudioUrl) {
+      const audio = new Audio(pendingAudioUrl)
+      audio.preload = "auto"
+      audio.muted = false
+      audio.volume = 1
+      setCurrentAudio(audio)
+      audio.play().then(() => setIsSpeaking(true)).catch((error) => {
+        console.error("Manual play (pending) failed:", error)
+      })
     }
   }
 
@@ -384,6 +414,15 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
                 type="button"
                 variant="ghost"
                 size="sm"
+                onClick={playAudio}
+                className="h-6 px-2 text-xs"
+              >
+                Play
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={stopAudio}
                 className="ml-auto h-6 px-2 text-xs"
               >
@@ -398,6 +437,33 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
                 style={{ width: `${audioProgress}%` }}
               />
             </div>
+          </div>
+        )}
+
+        {pendingAudioUrl && (
+          <div className="mt-3 space-y-2">
+            <div className="text-sm text-muted-foreground font-light">
+              Autoplay was blocked. Tap play to hear the response.
+            </div>
+            <audio
+              src={pendingAudioUrl}
+              controls
+              autoPlay
+              onPlay={() => {
+                setIsSpeaking(true)
+              }}
+              onEnded={() => {
+                setIsSpeaking(false)
+                setAudioProgress(0)
+                URL.revokeObjectURL(pendingAudioUrl)
+                setPendingAudioUrl(null)
+              }}
+              onError={() => {
+                setIsSpeaking(false)
+                setPendingAudioUrl(null)
+              }}
+              className="w-full"
+            />
           </div>
         )}
       </div>

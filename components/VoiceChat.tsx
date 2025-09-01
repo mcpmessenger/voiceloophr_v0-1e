@@ -29,6 +29,9 @@ export default function VoiceChat({ documentText, documentName, isOpen, onClose 
   const [isLoading, setIsLoading] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false)
+  const [lastTranscription, setLastTranscription] = useState<string>("")
+  const [lastTranscriptionAt, setLastTranscriptionAt] = useState<number>(0)
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -48,8 +51,54 @@ export default function VoiceChat({ documentText, documentName, isOpen, onClose 
     }
   }, [isOpen, documentName, messages.length])
 
+  // Attempt autoplay when a new audioUrl is set and the <audio> element mounts
+  useEffect(() => {
+    const el = audioRef.current
+    if (!audioUrl || !el) return
+
+    // Ensure element has the latest src
+    if (!el.src || el.src !== audioUrl) {
+      try { el.pause() } catch {}
+      el.src = audioUrl
+      el.load()
+    }
+
+    const tryPlay = () => {
+      el.play().then(() => {
+        setIsPlaying(true)
+        setAutoplayBlocked(false)
+      }).catch((err) => {
+        console.warn('Autoplay failed (effect):', err)
+        setAutoplayBlocked(true)
+        setIsPlaying(false)
+      })
+    }
+
+    tryPlay()
+    el.oncanplaythrough = tryPlay
+  }, [audioUrl])
+
   const startRecording = async () => {
     try {
+      // Guard: mic access requires secure context (HTTPS or localhost) and mediaDevices support
+      const isBrowser = typeof window !== 'undefined'
+      const isSecure = isBrowser && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')
+      const hasMedia = typeof navigator !== 'undefined' && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+
+      if (!isSecure || !hasMedia) {
+        console.warn('Microphone unavailable', { isSecure, hasMedia, host: isBrowser ? window.location.host : 'n/a' })
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'ai',
+            content: 'Microphone access is unavailable in this context. Please open the app via https:// or http://localhost (not a LAN IP), then try again. You can still type your question below.',
+            timestamp: new Date()
+          }
+        ])
+        return
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       mediaRecorderRef.current = new MediaRecorder(stream)
       audioChunksRef.current = []
@@ -85,30 +134,51 @@ export default function VoiceChat({ documentText, documentName, isOpen, onClose 
     try {
       setIsLoading(true)
       
-      // Convert audio to text using OpenAI Whisper
-      const formData = new FormData()
-      formData.append('file', audioBlob, 'audio.wav')
-      formData.append('model', 'whisper-1')
-
-      const openaiKey = localStorage.getItem('openai_api_key')
+      // Convert audio to text via our server STT proxy to avoid CORS
+      const openaiKey = localStorage.getItem('voiceloop_openai_key') || localStorage.getItem('openai_api_key')
       if (!openaiKey) {
         throw new Error('OpenAI API key not configured')
       }
 
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'recording.wav')
+      formData.append('openaiKey', openaiKey)
+
+      const response = await fetch('/api/stt', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`
-        },
         body: formData
       })
 
       if (!response.ok) {
-        throw new Error('Failed to transcribe audio')
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Speech-to-text failed')
       }
 
       const result = await response.json()
-      const transcribedText = result.text
+      const transcribedText = (result.transcription || result.text || "").trim()
+
+      // Basic noise filtering: ignore too-short/low-signal phrases and common false positives
+      const normalized = transcribedText.toLowerCase()
+      const wordCount = normalized.split(/\s+/).filter(Boolean).length
+      const shortStoplist = new Set(["you", "test", "yeah", "uh", "um", "okay", "ok"])
+      const now = Date.now()
+      const isRepeat = normalized === lastTranscription.toLowerCase() && (now - lastTranscriptionAt) < 8000
+
+      if (!normalized || normalized.length < 5 || wordCount < 2 || shortStoplist.has(normalized) || isRepeat) {
+        // Surface a lightweight note in the thread but don't hit the AI
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'ai',
+          content: 'Heard very short or unclear audio. Please try again or speak a full question.',
+          timestamp: new Date()
+        }])
+        setLastTranscription(transcribedText)
+        setLastTranscriptionAt(now)
+        return
+      }
+
+      setLastTranscription(transcribedText)
+      setLastTranscriptionAt(now)
 
       // Add user message
       const userMessage: Message = {
@@ -140,7 +210,7 @@ export default function VoiceChat({ documentText, documentName, isOpen, onClose 
     try {
       setIsLoading(true)
 
-      const openaiKey = localStorage.getItem('openai_api_key')
+      const openaiKey = localStorage.getItem('voiceloop_openai_key') || localStorage.getItem('openai_api_key')
       if (!openaiKey) {
         throw new Error('OpenAI API key not configured')
       }
@@ -185,7 +255,28 @@ Answer:`
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get AI response')
+        let detail = ''
+        try {
+          const errBody = await response.json()
+          detail = errBody?.error?.message || JSON.stringify(errBody)
+        } catch (_) {
+          try { detail = await response.text() } catch { detail = '' }
+        }
+        console.error('OpenAI chat error:', response.status, response.statusText, detail)
+        // Show a helpful, user-facing message
+        let friendly = 'Sorry, I could not reach the AI service.'
+        if (response.status === 401) {
+          friendly = 'OpenAI key is invalid or missing. Please update your key in Settings and try again.'
+        } else if (response.status === 429) {
+          friendly = 'OpenAI quota exceeded for this key. Please check your plan/billing or try again later.'
+        }
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'ai',
+          content: friendly,
+          timestamp: new Date()
+        }])
+        return
       }
 
       const result = await response.json()
@@ -219,7 +310,28 @@ Answer:`
 
   const generateSpeech = async (text: string) => {
     try {
-      const openaiKey = localStorage.getItem('openai_api_key')
+      // Prefer ElevenLabs if configured; fallback to OpenAI TTS
+      const elevenKey = localStorage.getItem('voiceloop_elevenlabs_key')
+      if (elevenKey) {
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, elevenlabsKey: elevenKey })
+        })
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}))
+          throw new Error(err.error || 'ElevenLabs TTS failed')
+        }
+
+        const audioBlob = await response.blob()
+        console.log('TTS blob size(bytes):', audioBlob.size)
+        const url = URL.createObjectURL(audioBlob)
+        setAudioUrl(url)
+        return
+      }
+
+      const openaiKey = localStorage.getItem('voiceloop_openai_key') || localStorage.getItem('openai_api_key')
       if (!openaiKey) return
 
       const response = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -239,15 +351,9 @@ Answer:`
       if (!response.ok) return
 
       const audioBlob = await response.blob()
+      console.log('TTS blob size(bytes):', audioBlob.size)
       const url = URL.createObjectURL(audioBlob)
       setAudioUrl(url)
-
-      // Auto-play the audio
-      if (audioRef.current) {
-        audioRef.current.src = url
-        audioRef.current.play()
-        setIsPlaying(true)
-      }
     } catch (error) {
       console.error('Error generating speech:', error)
     }
@@ -276,14 +382,24 @@ Answer:`
   }
 
   const toggleAudio = () => {
-    if (audioRef.current) {
+    const el = audioRef.current
+    if (!el) return
+    try {
       if (isPlaying) {
-        audioRef.current.pause()
+        el.pause()
         setIsPlaying(false)
       } else {
-        audioRef.current.play()
-        setIsPlaying(true)
+        el.play().then(() => setIsPlaying(true)).catch((err) => {
+          // Ignore AbortError (happens if paused mid-play), show controls otherwise
+          if (!(err && (err.name === 'AbortError' || err.name === 'NotAllowedError'))) {
+            console.warn('Manual play failed:', err)
+          }
+          setAutoplayBlocked(true)
+          setIsPlaying(false)
+        })
       }
+    } catch (err) {
+      console.warn('Toggle audio error:', err)
     }
   }
 
@@ -360,10 +476,10 @@ Answer:`
                 {isPlaying ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </Button>
               <span className="text-xs text-muted-foreground">
-                {isPlaying ? 'Playing AI response...' : 'AI response ready'}
+                {isPlaying ? 'Playing AI response...' : (autoplayBlocked ? 'AI response ready — tap play' : 'AI response ready')}
               </span>
             </div>
-            <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+            <audio ref={audioRef} src={audioUrl ?? undefined} onEnded={() => setIsPlaying(false)} controls={autoplayBlocked} />
           </div>
         )}
 
