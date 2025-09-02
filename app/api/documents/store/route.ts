@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// Initialize OpenAI client only when needed (not at build time)
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY not configured')
+  }
+  return new OpenAI({ apiKey })
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,9 +34,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to store document' }, { status: 500 })
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 })
-    }
+    // Get OpenAI client when needed
+    const openai = getOpenAIClient()
 
     const embeddingResponse = await openai.embeddings.create({
       model: 'text-embedding-3-small',
