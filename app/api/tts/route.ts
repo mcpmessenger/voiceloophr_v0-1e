@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { text, elevenlabsKey } = await request.json()
+    const { text, elevenlabsKey, voiceId: clientVoiceId } = await request.json()
 
     if (!text || !elevenlabsKey) {
       return NextResponse.json({ error: "Missing text or ElevenLabs key" }, { status: 400 })
@@ -13,8 +13,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Text too long. Maximum length is 5000 characters" }, { status: 400 })
     }
 
-    // Get voice ID from environment or use default
-    const voiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
+    // Resolve voice: allow either voice ID or human-readable name (e.g., "Jessica")
+    let voiceId = clientVoiceId || process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
+    const looksLikeId = typeof voiceId === 'string' && voiceId.length > 20 && !/\s/.test(voiceId)
+    if (!looksLikeId && typeof voiceId === 'string' && voiceId.trim().length > 0) {
+      try {
+        const voicesResp = await fetch('https://api.elevenlabs.io/v1/voices', {
+          headers: { 'xi-api-key': elevenlabsKey }
+        })
+        if (voicesResp.ok) {
+          const data = await voicesResp.json().catch(() => ({} as any))
+          const match = Array.isArray(data?.voices)
+            ? data.voices.find((v: any) => String(v?.name || '').toLowerCase().includes(voiceId.toLowerCase()))
+            : null
+          if (match?.voice_id) voiceId = match.voice_id
+        }
+      } catch (e) {
+        // Non-fatal: fall back to default if lookup fails
+        console.warn('ElevenLabs voices lookup failed:', e)
+      }
+    }
 
     // Call ElevenLabs TTS API
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -35,8 +53,17 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+      try {
+        const ct = response.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+          const errorData = await response.json()
+          errorMessage = errorData?.detail || errorData?.message || JSON.stringify(errorData)
+        } else {
+          const textBody = await response.text()
+          if (textBody) errorMessage = textBody
+        }
+      } catch {}
       throw new Error(`TTS generation failed: ${errorMessage}`)
     }
 

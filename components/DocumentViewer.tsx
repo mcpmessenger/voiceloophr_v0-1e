@@ -27,7 +27,7 @@ import {
   Music, 
   Video as VideoIcon
 } from "lucide-react"
-import { ActualDocumentViewer } from "./actual-document-viewer"
+// Removed modal viewer usage to simplify UX; in-tab viewer is used
 import dynamic from 'next/dynamic'
 
 // Create a client-side only PDF viewer component
@@ -65,7 +65,7 @@ export function DocumentViewer({
 }: DocumentViewerProps) {
   const [copied, setCopied] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("summary")
-  const [actualViewerOpen, setActualViewerOpen] = useState(false)
+  // Removed blue modal state; we render in-tab only
   const [fileData, setFileData] = useState<string | null>(null)
   const [loadingFileData, setLoadingFileData] = useState(false)
 
@@ -137,12 +137,7 @@ export function DocumentViewer({
     }
   }
 
-  const handleOpenDocumentViewer = async () => {
-    if (!fileData) {
-      await fetchFileData(document.id)
-    }
-    setActualViewerOpen(true)
-  }
+  // No separate modal open handler
 
   return (
     <div className="space-y-6">
@@ -452,19 +447,7 @@ export function DocumentViewer({
         </Button>
       </div>
 
-      {/* Actual Document Viewer Modal */}
-      <ActualDocumentViewer
-        document={{
-          id: document.id,
-          name: document.name,
-          type: document.type,
-          size: document.size,
-          extractedText: document.extractedText,
-          fileData: fileData || undefined, // Pass the base64 file data
-        }}
-        isOpen={actualViewerOpen}
-        onClose={() => setActualViewerOpen(false)}
-      />
+      {/* Modal viewer removed */}
     </div>
   )
 }
@@ -571,11 +554,9 @@ function DocumentViewerContent({
     }
 
     if (document.type.includes("pdf")) {
+      const pdfUrl = `data:application/pdf;base64,${fileData}`
       return (
-        <ClientPDFViewer 
-          fileData={fileData}
-          document={document}
-        />
+        <iframe src={pdfUrl} className="w-full h-[70vh] rounded-md border" />
       )
     } else if (document.type.startsWith("image/")) {
       return (

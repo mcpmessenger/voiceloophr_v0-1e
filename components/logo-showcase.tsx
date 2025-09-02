@@ -19,6 +19,10 @@ const logos = [
   {
     src: "/images/supabase-logo-wordmark--dark.svg",
     alt: "Supabase"
+  },
+  {
+    src: "/images/AWS_textract_logo.webp",
+    alt: "AWS Textract"
   }
 ]
 
