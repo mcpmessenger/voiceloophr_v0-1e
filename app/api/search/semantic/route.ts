@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { supabaseAdmin } from '@/lib/supabase'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// Initialize OpenAI client only when needed (not at build time)
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY not configured')
+  }
+  return new OpenAI({ apiKey })
+}
 
 interface SearchRequestBody {
   query: string
@@ -23,13 +30,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Query parameter is required' }, { status: 400 })
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY not configured', code: 'OPENAI_KEY_MISSING' }, { status: 500 })
-    }
-
     if (!supabaseAdmin) {
       return NextResponse.json({ error: 'Supabase not configured', code: 'SUPABASE_MISSING' }, { status: 500 })
     }
+
+    // Get OpenAI client when needed
+    const openai = getOpenAIClient()
 
     let queryEmbedding: number[] | null = null
     try {

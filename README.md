@@ -380,5 +380,3 @@ pnpm lint
 ---
 
 **🔍 VoiceLoop HR Platform is in research phase for PDF parsing optimization. Current implementation has issues with text extraction quality and processing method confusion. Comprehensive evaluation of parsing solutions in progress to deliver robust, cost-effective document processing.**
-   
- 
