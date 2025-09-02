@@ -8,6 +8,7 @@ import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { Upload, Mic, Search, Zap, FileText, Volume2, LayoutDashboard } from "lucide-react"
 import { useEffect, useState } from 'react'
 import { AuthModal } from '@/components/auth-modal'
+import LogoShowcase from '@/components/logo-showcase'
 
 export default function HomePage() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -111,12 +112,12 @@ export default function HomePage() {
             />
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-light text-foreground mb-6 text-balance">
+          <h1 className="text-5xl md:text-6xl font-montserrat-light text-foreground mb-6 text-balance">
             Transform Documents into
             <span className="text-secondary"> Conversations</span>
           </h1>
 
-          <p className="text-xl text-muted-foreground font-light mb-8 max-w-2xl mx-auto text-pretty">
+          <p className="text-xl text-muted-foreground font-montserrat-light mb-8 max-w-2xl mx-auto text-pretty">
             Upload any document or audio file and engage in intelligent voice conversations with AI-powered summaries
             and semantic search.
           </p>
@@ -143,7 +144,7 @@ export default function HomePage() {
       {/* Features Grid */}
       <section className="py-16 px-6 bg-muted/30">
         <div className="container mx-auto max-w-6xl">
-          <h2 className="text-3xl font-light text-center mb-12 text-balance">Intelligent Document Processing</h2>
+          <h2 className="text-3xl font-montserrat-medium text-center mb-12 text-balance">Intelligent Document Processing</h2>
 
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="p-8 border-thin hover:border-accent/50 transition-colors">
@@ -197,11 +198,19 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Technology Showcase */}
+      <section className="py-20">
+        <div className="container mx-auto max-w-6xl">
+          <h2 className="text-2xl font-montserrat-medium text-center mb-6 text-balance text-muted-foreground">Powered by Leading AI Technologies</h2>
+          <LogoShowcase />
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 px-6">
         <div className="container mx-auto max-w-3xl text-center">
           <h2 className="text-4xl font-light mb-6 text-balance">Ready to Transform Your Documents?</h2>
-          <p className="text-xl text-muted-foreground font-light mb-8 text-pretty">
+          <p className="text-xl text-muted-foreground font-montserrat-light mb-8 text-pretty">
             Join thousands of professionals who are already using VoiceLoop to unlock the power of their documents
             through AI and voice interaction.
           </p>

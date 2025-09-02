@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { initializeGlobalStorage, getFileFromGlobalStorage, setFileInGlobalStorage } from '@/lib/global-storage'
 
 // Import MinimalPDFParser with error handling
 let MinimalPDFParser: any = null
@@ -28,19 +29,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Get file from global storage
-    global.uploadedFiles = global.uploadedFiles || new Map()
+    const storage = initializeGlobalStorage()
     console.log(`🔍 Looking for fileId: ${fileId}`)
-    console.log(`📊 Global storage has ${global.uploadedFiles.size} files`)
-    console.log(`🔑 Available fileIds: ${Array.from(global.uploadedFiles.keys()).join(', ')}`)
+    console.log(`📊 Global storage has ${storage.size} files`)
+    console.log(`🔑 Available fileIds: ${Array.from(storage.keys()).join(', ')}`)
     
-    const fileData = global.uploadedFiles.get(fileId)
+    const fileData = getFileFromGlobalStorage(fileId)
 
     if (!fileData) {
       console.error(`❌ File not found in global storage: ${fileId}`)
       console.log(`💡 This might be due to server restart in development mode`)
       
       // Try to provide a helpful error message
-      const availableFiles = Array.from(global.uploadedFiles.keys())
+      const availableFiles = Array.from(storage.keys())
       const errorDetails = availableFiles.length > 0 
         ? `File with ID ${fileId} not found in server memory. Available files: ${availableFiles.join(', ')}`
         : `File with ID ${fileId} not found. This might be due to server restart. Please upload the file again.`
@@ -136,7 +137,7 @@ This extracted content represents the actual text and visual elements from your 
       fileData.processingTime = new Date().toISOString()
 
       // Store updated data
-      global.uploadedFiles.set(fileId, fileData)
+      setFileInGlobalStorage(fileId, fileData)
       
       console.log(`✅ Fixed PDF parser processing completed: ${wordCount} words extracted`)
 
@@ -158,7 +159,7 @@ This extracted content represents the actual text and visual elements from your 
       // Update file data with error
       fileData.processingError = pdfError instanceof Error ? pdfError.message : "Unknown error"
       fileData.processed = false
-      global.uploadedFiles.set(fileId, fileData)
+      setFileInGlobalStorage(fileId, fileData)
 
       // Provide specific error guidance
       let errorDetails = pdfError instanceof Error ? pdfError.message : "Unknown error"

@@ -1,14 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-// Use global storage to match the process API route
-declare global {
-  var uploadedFiles: Map<string, any>
-}
-
-if (!global.uploadedFiles) {
-  global.uploadedFiles = new Map()
-  console.log('🔧 Global storage initialized')
-}
+import { initializeGlobalStorage, setFileInGlobalStorage } from "@/lib/global-storage"
 
 // Textract client removed - using fixed PDF parser instead
 
@@ -77,24 +68,14 @@ export async function POST(request: NextRequest) {
         wordCount = 0
       }
     } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      // Use our fixed PDF parser (FREE)
+      // Mark PDF for processing - don't try to parse here to avoid errors
       try {
-        console.log(`Processing PDF with Fixed PDF Parser: ${file.name}`)
-        
-        // Import and use our minimal PDF parser
-        const { MinimalPDFParser } = require('../../../lib/pdf-parser-minimal.js')
-        const pdfResult = await MinimalPDFParser.parsePDF(buffer)
-        
-        if (pdfResult.hasErrors) {
-          throw new Error(`PDF parsing failed: ${pdfResult.errors?.join(', ')}`)
-        }
-        
-        extractedText = pdfResult.text
-        wordCount = pdfResult.wordCount
-        processingMethod = "pdf-parse-fixed"
-        console.log(`PDF processed successfully: ${wordCount} words, confidence: ${(pdfResult.confidence * 100).toFixed(1)}%`)
+        console.log(`PDF uploaded: ${file.name} - will be processed separately`)
+        extractedText = "[PDF content - processing required]"
+        wordCount = 0
+        processingMethod = "pdf-upload"
       } catch (pdfError) {
-        console.warn(`Fixed PDF parsing failed for ${file.name}:`, pdfError)
+        console.warn(`PDF upload failed for ${file.name}:`, pdfError)
         extractedText = ""
         wordCount = 0
         processingMethod = "basic"
@@ -150,10 +131,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Store in global memory
-    global.uploadedFiles.set(fileId, fileData)
-    console.log(`✅ File stored in global memory: ${fileId} (${file.name})`)
-    console.log(`📊 Total files in global storage: ${global.uploadedFiles.size}`)
+    // Store in global memory using shared utility
+    setFileInGlobalStorage(fileId, fileData)
     
     // Optionally save to database with embeddings
     let saved = false
@@ -227,7 +206,8 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve uploaded files (for debugging)
 export async function GET() {
   try {
-    const files = Array.from(global.uploadedFiles.values()).map(file => ({
+    const storage = initializeGlobalStorage()
+    const files = Array.from(storage.values()).map(file => ({
       id: file.id,
       name: file.name,
       type: file.type,

@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { supabaseAdmin } from '@/lib/supabase'
-
-// Initialize OpenAI client only when needed (not at build time)
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY not configured')
-  }
-  return new OpenAI({ apiKey })
-}
+import { RAGService } from '@/lib/ragService'
 
 interface SearchRequestBody {
   query: string
@@ -30,45 +20,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Query parameter is required' }, { status: 400 })
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json({ error: 'Supabase not configured', code: 'SUPABASE_MISSING' }, { status: 500 })
+    // Use our RAG service for semantic search
+    const searchResult = await RAGService.searchDocuments(query, userId, limit, threshold)
+
+    if (!searchResult.success) {
+      return NextResponse.json({ 
+        error: searchResult.error || 'Search failed', 
+        code: 'SEARCH_ERROR' 
+      }, { status: 500 })
     }
 
-    // Get OpenAI client when needed
-    const openai = getOpenAIClient()
+    // Transform results to match the expected interface
+    const transformedResults = searchResult.results.map(result => ({
+      id: result.id,
+      fileName: result.fileName,
+      title: result.fileName,
+      snippet: result.chunkText.substring(0, 200) + '...',
+      relevanceScore: result.similarity,
+      fileType: 'document',
+      uploadedAt: result.createdAt,
+      matchedChunks: [result.chunkText.substring(0, 150) + '...']
+    }))
 
-    let queryEmbedding: number[] | null = null
-    try {
-      const embeddingResponse = await openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: query
-      })
-      queryEmbedding = embeddingResponse.data[0]?.embedding as unknown as number[]
-    } catch (e: any) {
-      console.error('OpenAI embedding error:', e)
-      return NextResponse.json({ error: 'Failed to generate query embedding', code: 'EMBEDDING_ERROR' }, { status: 500 })
-    }
-
-    if (!queryEmbedding) {
-      return NextResponse.json({ error: 'Failed to generate query embedding', code: 'NO_EMBEDDING' }, { status: 500 })
-    }
-
-    const { data: results, error } = await supabaseAdmin.rpc('search_documents', {
-      query_embedding: queryEmbedding,
-      match_threshold: threshold,
-      match_count: limit,
-      user_id_filter: userId ?? null
+    return NextResponse.json({ 
+      success: true, 
+      results: transformedResults, 
+      totalResults: transformedResults.length 
     })
 
-    if (error) {
-      console.error('Vector search error:', error)
-      return NextResponse.json({ error: 'Vector search failed', code: 'VECTOR_SEARCH_ERROR', details: error.message || error }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true, results: results ?? [], totalResults: results?.length ?? 0 })
   } catch (err) {
     console.error('Semantic search error:', err)
-    return NextResponse.json({ error: 'Internal server error during search', code: 'UNKNOWN' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error during search', 
+      code: 'UNKNOWN',
+      details: err instanceof Error ? err.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
 

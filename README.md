@@ -1,228 +1,93 @@
-# VoiceLoop HR Platform
+# VoiceLoop HR - Intelligent Document Analysis Platform
 
-*AI-Powered Document Processing & Voice Interaction for HR Professionals*
+![VoiceLoop HR Logo](public/images/voiceloop-logo.png)
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-🚀%20Visit%20Site-green?style=for-the-badge)](https://v0-voice-loop-hr-platform-git-311a9e-peercodeai-7933s-projects.vercel.app/)
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/peercodeai-7933s-projects/v0-voice-loop-hr-platform)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/ftTpqsXikOm)
-[![Next.js](https://img.shields.io/badge/Next.js-15.5.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0.2-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+VoiceLoop HR is a cutting-edge document analysis platform that combines AI-powered text extraction, semantic search, and intelligent document processing to revolutionize how organizations handle their HR documents and content.
 
-## 🚀 Live Demo
+## 🚀 Features
 
-**Visit the deployed VoiceLoop HR Platform:** [https://v0-voice-loop-hr-platform-git-311a9e-peercodeai-7933s-projects.vercel.app/](https://v0-voice-loop-hr-platform-git-311a9e-peercodeai-7933s-projects.vercel.app/)
-
-## 🎉 **NEW: Complete Document Processing & Dashboard System!**
-
-VoiceLoop HR now features **comprehensive file type support and intelligent document management**:
-
-### **📄 Universal File Type Support**
-- **Google Workspace** - Docs, Sheets, Slides, Forms
+### 📄 **Multi-Format Document Support**
+- **PDF Documents** - Full PDF parsing with visual viewer
 - **Microsoft Office** - Word (.docx), Excel (.xlsx), PowerPoint (.pptx)
-- **Legacy Office** - .doc, .xls, .ppt files
-- **Text Formats** - PDF, Markdown, CSV, Plain Text
-- **Media Files** - Audio (.wav), Video (.mp4) with Textract integration
-- **Smart Processing** - Automatic file type detection and routing
+- **Text Files** - Plain text, markdown, and more
+- **Media Files** - Images, audio, and video with transcription support
+- **CSV Files** - Spreadsheet data analysis
 
-### **📊 Enhanced Dashboard & Tracking**
-- **Document Persistence** - Cross-session document retention
-- **Dual Storage** - Database + localStorage integration
-- **Real-time Updates** - Auto-refresh and live document tracking
-- **Rich Metadata** - Processing method, word count, file size display
-- **File Type Icons** - Visual file type identification
-- **Activity Tracking** - Upload history and processing status
+### 🤖 **AI-Powered Analysis**
+- **OpenAI GPT-4 Integration** - Intelligent document summarization
+- **Whisper Integration** - Audio transcription capabilities
+- **Semantic Search** - Natural language document querying
+- **RAG (Retrieval-Augmented Generation)** - Context-aware responses
 
-### **🔐 Authentication & Security**
-- **Google OAuth Sign-in** - Secure authentication with Google accounts
-- **LinkedIn OIDC Integration** - Professional network authentication
-- **Supabase Auth** - Enterprise-grade user management
-- **Environment Security** - Protected API keys and credentials
-
-### **📚 Document Storage & Search**
-- **Supabase Integration** - PostgreSQL database with vector storage
-- **OpenAI Embeddings** - Semantic document search capabilities
-- **Vector Database** - pg_vector extension for intelligent queries
-- **Document Management** - Store, retrieve, and organize documents
-
-### **🎤 Voice Interaction Capabilities**
-- **OpenAI Whisper** - Professional-grade speech recognition
-- **ElevenLabs** - Natural-sounding voice synthesis
-- **Voice Chat Interface** - Full voice conversation with AI
-- **Audio Streaming** - Real-time audio playback
-
-## 📊 **Current Implementation Status**
-
-### **✅ Completed Features**
-- **Universal File Upload**: Drag & drop with comprehensive format support
-- **Multi-Format Processing**: Google Workspace, Microsoft Office, PDF, CSV, audio, video
-- **Smart File Detection**: Automatic file type identification and routing
-- **Advanced Text Extraction**: Mammoth (DOCX), XLSX (Excel), custom PPTX parser
-- **AI Analysis**: OpenAI integration for document summarization and insights
-- **Voice Chat**: Interactive document queries with voice
-- **Whisper STT + ElevenLabs TTS**: Real voice in/out
-- **Enhanced Dashboard**: Document tracking, persistence, and management
-- **Dual Storage System**: Database + localStorage integration
-- **Search Interface**: Document search and retrieval
-- **Responsive UI**: Modern dark theme with Tailwind CSS
-- **Optional Textract**: AWS Textract can be enabled as a paid fallback
-- **🔐 Authentication System**: Google OAuth and LinkedIn OIDC integration
-- **📚 Document Storage**: Supabase PostgreSQL with vector embeddings
-- **🔍 Semantic Search**: OpenAI-powered intelligent document querying
-- **🛡️ Security**: Protected environment variables and credential management
-- **☁️ Cloud Integration**: Google Drive import capabilities
-
-### **🔍 Research Phase**
-- **PDF Parsing Solutions**: Comprehensive evaluation of parsing libraries
-- **Architecture Design**: Optimal processing pipeline design
-- **Cost Analysis**: Total cost of ownership evaluation
-- **Implementation Planning**: Detailed roadmap creation
-
-### **📋 Planned Features**
-- Document versioning and collaboration
-- Advanced analytics dashboard
-- Export to multiple formats
-- HR system integrations
-
-## Overview
-
-VoiceLoop HR is an intelligent document processing platform that leverages AI to extract, analyze, and summarize HR documents. Built with Next.js 15 and TypeScript, it provides a modern, scalable solution for document management, AI-powered insights, and **natural voice interaction**.
-
-**🚀 NEW: Voice Interaction** - Speak to your documents and hear AI responses in natural voice!
-
-## Features
-
-### 🚀 **Core Capabilities**
-- **Multi-format Support**: PDF, DOCX, CSV, Markdown, and text files
-- **AI-Powered Analysis**: OpenAI GPT-4 integration for intelligent summarization
-- **Smart Document Processing**: Intelligent text extraction and content analysis
-- **Voice Integration**: Real-time speech recognition and voice synthesis
-- **Modern UI**: Beautiful, responsive interface with Radix UI components
-
-### 📄 **Document Processing**
-- **PDF Processing**: Local extraction via `pdf-parse` with quality tuning
-- **Microsoft Word**: Full DOCX support with Mammoth library
-- **Microsoft Excel**: XLSX/XLS parsing with structured data extraction
-- **Microsoft PowerPoint**: PPTX text extraction with custom parser
-- **Google Workspace**: Docs, Sheets, Slides integration
-- **CSV Analysis**: Structured data processing and insights
-- **Markdown Rendering**: Rich text formatting and analysis
-- **Text Files**: Plain text processing and analysis
-- **Audio/Video**: WAV/MP4 support with Textract transcription
-- **Textract (Optional)**: Enterprise-grade OCR fallback when needed
+### 🔍 **Advanced Document Processing**
+- **Smart Text Extraction** - Multiple parsing methods for optimal results
+- **Document Viewer** - Integrated PDF viewer with zoom, rotation, and navigation
+- **Real-time Processing** - Instant document analysis and feedback
+- **Batch Processing** - Handle multiple documents efficiently
 
 ### 🔐 **Authentication & Security**
-- **Google OAuth**: Secure sign-in with Google accounts
-- **LinkedIn OIDC**: Professional network authentication
-- **Supabase Auth**: Enterprise-grade user management
-- **Environment Protection**: Secure API key management
-- **Session Management**: Persistent user authentication
+- **Supabase Integration** - Secure user authentication
+- **Google OAuth** - One-click Google sign-in
+- **LinkedIn Integration** - Professional network authentication
+- **Guest Mode** - Try the platform without registration
+- **Row Level Security** - Data protection and privacy
 
-### 📚 **Document Storage & Search**
-- **Supabase Integration**: PostgreSQL database with vector storage
-- **OpenAI Embeddings**: Semantic document search capabilities
-- **Vector Database**: pg_vector extension for intelligent queries
-- **Document Management**: Store, retrieve, and organize documents
-- **Google Drive Import**: Direct file import from Google Drive
+### 💾 **Flexible Storage Options**
+- **Database Storage** - Persistent document storage with Supabase
+- **Local Storage** - Guest mode with browser-based storage
+- **Vector Embeddings** - Semantic search capabilities
+- **File Management** - Upload, organize, and manage documents
 
-### 🎤 **Voice Features**
-- **Speech-to-Text**: Real-time audio transcription with OpenAI Whisper
-- **Text-to-Speech**: Natural voice synthesis with ElevenLabs
-- **Voice Chat**: Full voice conversation with AI assistant
-- **Audio Controls**: Progress tracking and playback controls
-- **Multi-language Support**: Automatic language detection
+### 🎨 **Modern User Interface**
+- **Responsive Design** - Works on desktop, tablet, and mobile
+- **Dark/Light Mode** - User preference support
+- **Montserrat Font** - Clean, modern typography
+- **Intuitive Navigation** - Easy-to-use interface
+- **Real-time Feedback** - Loading states and progress indicators
 
-### 🤖 **AI Services**
-- **Document Summarization**: Intelligent content summarization with GPT-4
-- **Question Answering**: AI-powered document Q&A
-- **Content Analysis**: Key insights and actionable recommendations
-- **Voice Interaction**: Natural conversation with documents
-- **Embedding Generation**: Vector embeddings for semantic search
-
-### 🎨 **User Experience**
-- **Drag & Drop Uploads**: Intuitive file handling
-- **Real-time Progress**: Live upload and processing status
-- **Responsive Design**: Mobile and desktop optimized
-- **Vibrant UI**: Modern, engaging interface with smooth animations
-- **Error Handling**: Graceful fallbacks and user-friendly messages
-
-## Technology Stack
+## 🛠️ Technology Stack
 
 ### **Frontend**
-- **Next.js 15**: React framework with App Router
-- **TypeScript**: Type-safe development
-- **Tailwind CSS**: Utility-first styling
-- **Shadcn/ui**: Modern component library
-
-### **Backend & Database**
-- **Supabase**: PostgreSQL database with real-time subscriptions
-- **pg_vector**: Vector storage for semantic search
-- **OpenAI API**: GPT-4 and embeddings integration
-- **Next.js API Routes**: Serverless backend functions
-
-### **Authentication & Security**
-- **Supabase Auth**: OAuth providers (Google, LinkedIn)
-- **Environment Variables**: Secure credential management
-- **Row Level Security**: Database-level access control
-- **React Dropzone**: File upload handling
-- **Sonner**: Toast notifications
-- **Lucide React**: Beautiful icon set
+- **Next.js 15** - React framework with App Router
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Utility-first styling
+- **Radix UI** - Accessible component library
+- **Lucide React** - Beautiful icons
+- **React PDF** - PDF viewing capabilities
 
 ### **Backend**
-- **Next.js API Routes**: Server-side API endpoints
-- **Node.js**: JavaScript runtime
-- **Document Processing**: Multi-format extraction with FileProcessor class
-- **Mammoth**: DOCX text extraction
-- **XLSX**: Excel file parsing
-- **Custom PPTX Parser**: PowerPoint text extraction
-- **OpenAI Whisper**: Speech-to-text processing
-- **ElevenLabs**: Text-to-speech synthesis
-- **AI Integration**: OpenAI API services
-- **AWS Textract (optional)**: OCR fallback when configured
+- **Next.js API Routes** - Serverless API endpoints
+- **Supabase** - Database and authentication
+- **PostgreSQL** - Relational database with pg_vector extension
+- **OpenAI API** - GPT-4 and Whisper integration
+
+### **Document Processing**
+- **Mammoth** - DOCX parsing
+- **XLSX** - Excel file processing
+- **PDF-Parse** - PDF text extraction
+- **Custom PDF Parser** - Enhanced PDF processing
+- **File Type Detection** - Automatic format recognition
 
 ### **Development Tools**
-- **pnpm**: Fast package manager (Vercel uses `packageManager: pnpm@9`)
-- **ESLint**: Code quality and consistency
-- **TypeScript**: Static type checking
-- **PostCSS**: CSS processing
-- **Jest**: Testing framework
+- **pnpm** - Fast package manager
+- **ESLint** - Code linting
+- **TypeScript** - Static type checking
+- **Hot Reload** - Development efficiency
 
-## 📁 **Supported File Types**
-
-### **📄 Document Formats**
-- **PDF** - Text extraction with pdf-parse
-- **Microsoft Word** - .docx (Mammoth), .doc (legacy)
-- **Microsoft Excel** - .xlsx, .xls (XLSX library)
-- **Microsoft PowerPoint** - .pptx, .ppt (custom parser)
-- **Google Workspace** - Docs, Sheets, Slides (via Google Drive API)
-- **CSV** - Structured data processing
-- **Markdown** - .md files with rich formatting
-- **Plain Text** - .txt files
-
-### **🎵 Media Formats**
-- **Audio** - .wav, .mp3 (with Textract transcription)
-- **Video** - .mp4, .avi (with Textract transcription)
-
-### **🔧 Processing Methods**
-- **Direct Text Extraction** - PDF, DOCX, XLSX, PPTX, CSV, TXT, MD
-- **Google Drive Import** - Google Workspace files
-- **Textract Integration** - Audio/video transcription
-- **AI Analysis** - All text content with OpenAI GPT-4
-
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+ 
 - pnpm package manager
-- OpenAI API key (for AI features and Whisper)
-- ElevenLabs API key (for voice synthesis)
-- AWS account with Textract and S3 access (optional)
+- OpenAI API key
+- Supabase account (optional for guest mode)
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/peercodeai/voiceloophr_v0-1e.git
-   cd voiceloophr_v0-1e
+   git clone https://github.com/yourusername/voiceloophr.git
+   cd voiceloophr
    ```
 
 2. **Install dependencies**
@@ -230,204 +95,195 @@ VoiceLoop HR is an intelligent document processing platform that leverages AI to
    pnpm install
    ```
 
-3. **Set up environment variables**
+3. **Environment Setup**
    ```bash
-   # Copy environment template
-   cp env.example .env.local
+   cp .env.example .env.local
+   ```
+   
+   Configure your environment variables:
+   ```env
+   # OpenAI Configuration
+   OPENAI_API_KEY=your_openai_api_key_here
+   
+   # Supabase Configuration (Optional)
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   
+   # Google OAuth (Optional)
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   
+   # LinkedIn OAuth (Optional)
+   LINKEDIN_CLIENT_ID=your_linkedin_client_id
+   LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
    ```
 
-4. **Configure API keys** (Required for voice features)
-   ```bash
-   # Add to .env.local
-   OPENAI_API_KEY=sk-your-openai-key-here
-   ELEVENLABS_API_KEY=your-elevenlabs-key-here
-   ```
-
-5. **Start development server**
+4. **Start Development Server**
    ```bash
    pnpm dev
    ```
 
-## 🎤 **Voice Features Setup**
+5. **Open in Browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
-### **OpenAI API Key (Whisper STT)**
-1. Visit [OpenAI Platform](https://platform.openai.com/account/api-keys)
-2. Create new API key
-3. Either:
-   - Add to `.env.local`: `OPENAI_API_KEY=sk-...`, or
-   - Save in-app via Settings (stored in browser under `voiceloop_openai_key`)
+## 📖 Usage Guide
 
-### **ElevenLabs API Key (TTS)**
-1. Visit [ElevenLabs](https://elevenlabs.io)
-2. Get your API key from account settings
-3. Either:
-   - Add to `.env.local`: `ELEVENLABS_API_KEY=...`, or
-   - Save in-app via Settings (`voiceloop_elevenlabs_key`)
+### **Guest Mode (No Registration Required)**
+1. Visit the homepage
+2. Click "Try Guest Mode"
+3. Upload documents and explore features
+4. Data stored locally in your browser
 
-### **Test Voice Features**
-1. Go to `/chat` page
-2. Click microphone to record voice
-3. Speak clearly and verify transcription
-4. Check TTS playback with AI responses
+### **Full Registration**
+1. Click "Sign Up" or "Get Started"
+2. Choose authentication method (Google, LinkedIn, or Email)
+3. Complete registration process
+4. Access full features with cloud storage
 
-## 🔑 AWS Credentials Setup (Optional)
+### **Document Upload & Analysis**
+1. **Upload Documents**
+   - Drag and drop files or click to browse
+   - Support for multiple file formats
+   - Real-time upload progress
 
-For document processing features, set up AWS credentials:
+2. **Automatic Processing**
+   - Text extraction and analysis
+   - AI-powered summarization
+   - Document metadata extraction
 
+3. **View Results**
+   - Summary tab for AI-generated insights
+   - Content tab for extracted text
+   - Document Viewer for visual preview
+   - Details tab for metadata
+
+### **Semantic Search**
+1. **Save for Search** - Enable semantic search on documents
+2. **Natural Language Queries** - Ask questions in plain English
+3. **Contextual Results** - Get relevant document sections
+4. **RAG Responses** - AI-generated answers based on your documents
+
+## 🔧 API Endpoints
+
+### **Document Management**
+- `POST /api/upload` - Upload and process documents
+- `GET /api/files/[fileId]` - Retrieve file data
+- `POST /api/textract` - Process PDF documents
+- `POST /api/analyze` - AI analysis of documents
+
+### **Search & Retrieval**
+- `POST /api/search/semantic` - Semantic search queries
+- `POST /api/embeddings` - Generate document embeddings
+- `POST /api/rag/save-for-search` - Save documents for search
+
+### **Database Operations**
+- `GET /api/documents` - List user documents
+- `POST /api/documents/save` - Save documents to database
+- `DELETE /api/documents/[id]` - Delete documents
+
+## 🎯 Key Features Explained
+
+### **Smart Document Processing**
+- **Multi-Method Parsing** - Uses different techniques for optimal text extraction
+- **Error Recovery** - Fallback methods when primary parsing fails
+- **Format Detection** - Automatic file type recognition
+- **Quality Assessment** - Confidence scoring for extracted content
+
+### **AI Integration**
+- **GPT-4 Summarization** - Intelligent document summaries
+- **Whisper Transcription** - Audio-to-text conversion
+- **Semantic Understanding** - Context-aware document analysis
+- **Natural Language Processing** - Human-like document interpretation
+
+### **Vector Search**
+- **Embedding Generation** - Convert documents to searchable vectors
+- **Similarity Matching** - Find related content across documents
+- **Contextual Retrieval** - Get relevant document sections
+- **RAG Implementation** - Generate answers from document knowledge
+
+## 🔒 Security & Privacy
+
+### **Data Protection**
+- **Row Level Security** - Database-level access control
+- **Encrypted Storage** - Secure data persistence
+- **API Authentication** - Protected endpoints
+- **User Isolation** - Data separation between users
+
+### **Privacy Features**
+- **Guest Mode** - No data collection without consent
+- **Local Storage** - Browser-based data for guests
+- **Optional Registration** - Use without creating accounts
+- **Data Deletion** - Remove documents and data on demand
+
+## 🚀 Deployment
+
+### **Vercel Deployment (Recommended)**
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+### **Docker Deployment**
 ```bash
-# Add to .env.local
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-S3_BUCKET_NAME=your-bucket-name
+# Build Docker image
+docker build -t voiceloophr .
+
+# Run container
+docker run -p 3000:3000 voiceloophr
 ```
 
-See `AWS_PERMISSIONS_SETUP.md` for detailed setup instructions.
+### **Manual Deployment**
+1. Build the application: `pnpm build`
+2. Start production server: `pnpm start`
+3. Configure reverse proxy (nginx/Apache)
+4. Set up SSL certificates
 
-## 📁 **Project Structure**
+## 🤝 Contributing
 
-```
-voiceloophr_v0-1e/
-├── app/                    # Next.js App Router
-│   ├── api/               # API endpoints
-│   │   ├── upload/        # File upload handling
-│   │   ├── textract/      # AWS Textract processing
-│   │   ├── process/       # AI document analysis
-│   │   ├── chat/          # AI chat interface
-│   │   ├── stt/           # Speech-to-text (Whisper)
-│   │   ├── tts/           # Text-to-speech (ElevenLabs)
-│   │   └── search/        # Document search
-│   ├── upload/            # File upload page
-│   ├── results/           # Document results view
-│   ├── search/            # Search interface
-│   ├── chat/              # Voice chat interface
-│   └── settings/          # Configuration page
-├── components/             # React components
-│   ├── ui/                # Shadcn/ui components
-│   ├── voice-chat.tsx     # Voice interaction
-│   └── search-interface.tsx # Search functionality
-├── lib/                    # Core libraries (Modular Architecture)
-│   ├── core/              # Core functionality
-│   │   ├── enhancedDocumentProcessor.ts # Main processor orchestrator
-│   │   └── index.ts       # Core exports
-│   ├── processors/        # File processors
-│   │   ├── audioProcessor.ts    # Audio processing
-│   │   ├── videoProcessor.ts    # Video processing
-│   │   ├── documentProcessor.ts # Document processing
-│   │   └── index.ts       # Processor exports
-│   ├── analyzers/         # Content analysis
-│   │   ├── textAnalyzer.ts      # Text metrics & structure
-│   │   ├── entityExtractor.ts   # Entity extraction
-│   │   ├── sentimentAnalyzer.ts # Sentiment analysis
-│   │   └── index.ts       # Analyzer exports
-│   ├── smartParser/       # AWS Textract integration
-│   ├── aiService.ts       # OpenAI integration
-│   └── utils.ts           # Utility functions
-└── public/                 # Static assets
-```
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
-## 📚 Documentation
+### **Development Setup**
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes
+4. Run tests: `pnpm test`
+5. Commit changes: `git commit -m 'Add amazing feature'`
+6. Push to branch: `git push origin feature/amazing-feature`
+7. Open a Pull Request
 
-### **Key Files**
-- **STT_TTS_UPGRADE_README.md**: Complete voice features setup guide
-- **MODULAR_ARCHITECTURE.md**: New modular architecture for AI management
-- **SMART_PARSER.md**: AWS Textract integration strategy
-- **AWS_PERMISSIONS_SETUP.md**: AWS IAM setup guide
-- **COST_OPTIMIZATION_GUIDE.md**: Cost management strategies
+## 📝 License
 
-### **API Resources**
-- [OpenAI Whisper API](https://platform.openai.com/docs/api-reference/audio)
-- [ElevenLabs API](https://elevenlabs.io/docs/api-reference)
-- [AWS Textract](https://docs.aws.amazon.com/textract/)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 📈 **Performance Metrics**
+## 🙏 Acknowledgments
 
-### **Current Benchmarks**
-- **Upload Speed**: ~2-5 seconds for 1MB files
-- **Text Extraction**: 2-3 seconds for PDFs (simulated)
-- **AI Processing**: 5-15 seconds depending on content
-- **STT Latency**: 2-5 seconds for voice transcription
-- **TTS Latency**: 1-3 seconds for speech generation
-- **Memory Usage**: ~50-100MB per document
+- **OpenAI** - For GPT-4 and Whisper APIs
+- **Supabase** - For backend infrastructure
+- **Vercel** - For deployment platform
+- **Next.js Team** - For the amazing framework
+- **React PDF** - For PDF viewing capabilities
 
-### **Scalability**
-- **Concurrent Uploads**: 5+ files simultaneously
-- **File Size Limit**: 100MB per file
-- **Audio Limit**: 25MB for Whisper processing
-- **Text Limit**: 5000 characters for TTS
+## 📞 Support
 
-### **Cost Optimization**
-- **Text Files**: FREE (direct processing)
-- **PDFs/Images**: $0.0015 per page with Textract
-- **Whisper STT**: ~$0.006 per minute
-- **ElevenLabs TTS**: ~$0.30 per 1000 characters
-- **User Control**: Choose when to use paid services
+- **Documentation** - [docs.voiceloophr.com](https://docs.voiceloophr.com)
+- **Issues** - [GitHub Issues](https://github.com/yourusername/voiceloophr/issues)
+- **Discussions** - [GitHub Discussions](https://github.com/yourusername/voiceloophr/discussions)
+- **Email** - support@voiceloophr.com
 
-## 🎯 Development Commands
+## 🔄 Changelog
 
-```bash
-# Install dependencies
-pnpm install
-
-# Start development server
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Run tests
-pnpm test
-
-# Lint code
-pnpm lint
-```
-
-## 🏗️ **New: Modular Architecture**
-
-### **🎯 AI-Optimized Code Structure**
-- ✅ **All files under 1000 lines** for optimal AI assistance
-- ✅ **Modular design** with clear separation of concerns
-- ✅ **Focused processors** for audio, video, and document files
-- ✅ **Specialized analyzers** for text, entities, and sentiment
-- ✅ **Factory patterns** for easy extension and maintenance
-
-### **📁 New Module Structure**
-- **`lib/core/`**: Main processor orchestrator (200 lines)
-- **`lib/processors/`**: File type handlers (150-400 lines each)
-- **`lib/analyzers/`**: Content analysis tools (200-400 lines each)
-- **`lib/smartParser/`**: AWS Textract integration
-
-## 🚀 What's Next?
-
-### **✅ Completed (This Week)**
-1. ✅ Set up development environment
-2. ✅ Configure AWS credentials and IAM permissions
-3. ✅ Create S3 bucket and test connectivity
-4. ✅ Implement file upload system with drag & drop
-5. ✅ Integrate AWS Textract for PDF/image processing
-6. ✅ Add smart processing with cost management
-7. ✅ Create AI analysis pipeline with OpenAI
-8. ✅ Build responsive UI with modern components
-9. ✅ **NEW: Implement real-time STT/TTS capabilities**
-10. ✅ **NEW: Add voice chat interface**
-11. ✅ **NEW: Implement modular architecture for AI management**
-12. ✅ **NEW: Universal file type support (Google Workspace, Microsoft Office)**
-13. ✅ **NEW: Enhanced dashboard with document tracking and persistence**
-14. ✅ **NEW: Dual storage system (Database + localStorage)**
-15. ✅ **NEW: Advanced text extraction for DOCX, XLSX, PPTX files**
-
-### **🔍 Current Focus**
-1. ✅ **COMPLETED: Universal file type processing system**
-2. ✅ **COMPLETED: Dashboard document tracking and management**
-3. ✅ **COMPLETED: Cross-session document persistence**
-
-### **📋 Next Phase**
-1. 🧪 Comprehensive testing and validation
-2. ⚡ Performance optimization and user experience improvements
-3. 📊 Advanced analytics and monitoring
-4. 🔄 Document versioning and collaboration features
+### **v0.1.0** - Initial Release
+- ✅ Multi-format document support
+- ✅ AI-powered analysis with GPT-4
+- ✅ Semantic search capabilities
+- ✅ PDF viewer with full controls
+- ✅ Guest mode for testing
+- ✅ Supabase integration
+- ✅ Modern responsive UI
+- ✅ Authentication system
 
 ---
 
-**🎉 VoiceLoop HR Platform now features comprehensive document processing with universal file type support, enhanced dashboard tracking, and cross-session document persistence. The platform successfully handles Google Workspace, Microsoft Office, PDF, CSV, audio, and video files with intelligent processing and AI-powered analysis.**
-     add a document viewr to the right of the 
+**Built with ❤️ by the VoiceLoop Team**
+
+*Transforming document analysis with the power of AI*

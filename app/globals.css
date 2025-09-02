@@ -83,4 +83,49 @@
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary));
   }
+
+  /* Font family utilities */
+  .font-montserrat {
+    font-family: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  }
+  
+  .font-montserrat-light {
+    font-family: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 300;
+  }
+  
+  .font-montserrat-medium {
+    font-family: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 500;
+  }
+  
+  .font-montserrat-semibold {
+    font-family: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+  }
+  
+  .font-montserrat-bold {
+    font-family: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+  }
+  
+
+  
+  /* Logo showcase animations */
+  @keyframes scroll-x {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  
+  .animate-scroll-x {
+    animation: scroll-x 60s linear infinite;
+  }
+  
+  .animate-scroll-x:hover {
+    animation-play-state: paused;
+  }
 }

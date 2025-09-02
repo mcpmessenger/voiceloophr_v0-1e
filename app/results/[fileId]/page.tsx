@@ -12,6 +12,8 @@ import { LocalStorageManager } from "@/lib/utils/storage"
 import OpenAISettings from "@/components/OpenAISettings"
 import VoiceChat from "@/components/VoiceChat"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import SaveForSearchButton from "@/components/save-for-search-button"
+import SaveToDatabaseButton from "@/components/save-to-database-button"
 
 interface ProcessedFile {
   id: string
@@ -351,6 +353,36 @@ export default function ResultsPage() {
             }}
             onStartVoiceChat={() => setIsVoiceChatOpen(true)}
           />
+
+          {/* Save Options */}
+          <div className="mt-6 space-y-4">
+            {/* Save to Database Button */}
+            <SaveToDatabaseButton
+              documentId={fileData.id}
+              fileName={fileData.name}
+              text={fileData.extractedText}
+              userId={undefined}
+              isSaved={false} // This will be updated based on localStorage
+              onSaved={() => {
+                // Refresh the page or update state
+                window.location.reload()
+              }}
+            />
+
+            {/* Save for Search Button */}
+            <SaveForSearchButton
+              documentId={fileData.id}
+              fileName={fileData.name}
+              text={fileData.extractedText}
+              userId={undefined}
+              isSearchable={false} // This will be updated based on localStorage
+              searchChunks={0}
+              onSaved={() => {
+                // Refresh the page or update state
+                window.location.reload()
+              }}
+            />
+          </div>
 
           {/* OpenAI Settings - Only show if user opens voice chat and no key configured */}
           {typeof window !== 'undefined' && isVoiceChatOpen && !localStorage.getItem('voiceloop_openai_key') && (
