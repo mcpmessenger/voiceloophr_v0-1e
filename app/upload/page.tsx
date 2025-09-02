@@ -12,7 +12,6 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2, Eye } from "lucide-react"
-import DocumentViewer from "@/components/DocumentViewer"
 import GoogleDriveImport from '@/components/google-drive-import'
 
 interface UploadedFile {
@@ -982,13 +981,49 @@ export default function UploadPage() {
                  )}
        </div>
 
-       {/* Document Viewer Modal */}
-       <DocumentViewer
-         file={selectedFile}
-         fileData={selectedFileData}
-         isOpen={documentViewerOpen}
-         onClose={() => setDocumentViewerOpen(false)}
-       />
+       {/* File Preview Modal */}
+       {documentViewerOpen && selectedFile && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+           <div className="bg-background border-2 border-primary/20 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+             <div className="flex items-center justify-between mb-4">
+               <h2 className="text-xl font-light text-foreground">File Preview</h2>
+               <Button
+                 variant="ghost"
+                 size="sm"
+                 onClick={() => setDocumentViewerOpen(false)}
+                 className="text-muted-foreground hover:text-foreground"
+               >
+                 <X className="h-4 w-4" />
+               </Button>
+             </div>
+             
+             <div className="space-y-4">
+               <div className="flex items-center gap-3">
+                 {getFileIcon(selectedFile)}
+                 <div>
+                   <h3 className="font-medium text-foreground">{selectedFile.name}</h3>
+                   <p className="text-sm text-muted-foreground">
+                     {selectedFile.type} • {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                   </p>
+                 </div>
+               </div>
+               
+               {selectedFileData?.processed && (
+                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                   <p className="text-sm text-green-800">
+                     ✅ File processed successfully
+                   </p>
+                 </div>
+               )}
+               
+               <div className="text-sm text-muted-foreground">
+                 <p>File uploaded and ready for processing.</p>
+                 <p>Use the processing options below to extract text and generate insights.</p>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
        <GoogleDriveImport
          open={driveOpen}
          onClose={() => setDriveOpen(false)}

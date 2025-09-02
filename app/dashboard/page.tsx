@@ -22,6 +22,7 @@ import {
   MoreVertical,
   Eye,
   Trash2,
+  RefreshCw,
 } from "lucide-react"
 
 interface Document {
@@ -47,6 +48,7 @@ interface ActivityItem {
 export default function DashboardPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
+  const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState({
     totalDocuments: 0,
     totalProcessed: 0,
@@ -54,54 +56,72 @@ export default function DashboardPage() {
     totalChats: 0,
   })
 
-  useEffect(() => {
-    const load = async () => {
+  const loadDocuments = async () => {
+    setLoading(true)
+    try {
+      // Include user filter if signed in (server reads userId query param)
+      let userIdParam = ''
       try {
-        // Include user filter if signed in (server reads userId query param)
-        let userIdParam = ''
-        try {
-          const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
-          const supabase = getSupabaseBrowser()
-          if (supabase) {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user?.id) userIdParam = `?userId=${encodeURIComponent(user.id)}`
-          }
-        } catch {}
-
-        const res = await fetch(`/api/documents${userIdParam}`)
-        const data = await res.json().catch(() => ({}))
-        if (res.ok && Array.isArray(data.documents)) {
-          const mapped: Document[] = data.documents.map((d: any) => ({
-            id: d.id,
-            name: d.file_name || 'Document',
-            type: d.mime_type || 'text/plain',
-            size: d.file_size || (d.content ? d.content.length : 0),
-            status: 'completed',
-            uploadedAt: d.uploaded_at,
-            lastAccessed: undefined,
-            summary: undefined,
-            processingTime: undefined,
-          }))
-          setDocuments(mapped)
-          setStats({
-            totalDocuments: mapped.length,
-            totalProcessed: mapped.length,
-            totalSearches: 0,
-            totalChats: 0,
-          })
-          setRecentActivity([])
-        } else {
-          setDocuments([])
-          setRecentActivity([])
-          setStats({ totalDocuments: 0, totalProcessed: 0, totalSearches: 0, totalChats: 0 })
+        const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
+        const supabase = getSupabaseBrowser()
+        if (supabase) {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user?.id) userIdParam = `?userId=${encodeURIComponent(user.id)}`
         }
-      } catch {
+      } catch {}
+
+      const res = await fetch(`/api/documents${userIdParam}`)
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && Array.isArray(data.documents)) {
+        const mapped: Document[] = data.documents.map((d: any) => ({
+          id: d.id,
+          name: d.file_name || 'Document',
+          type: d.mime_type || 'text/plain',
+          size: d.file_size || (d.content ? d.content.length : 0),
+          status: 'completed',
+          uploadedAt: d.uploaded_at,
+          lastAccessed: undefined,
+          summary: undefined,
+          processingTime: undefined,
+        }))
+        setDocuments(mapped)
+        setStats({
+          totalDocuments: mapped.length,
+          totalProcessed: mapped.length,
+          totalSearches: 0,
+          totalChats: 0,
+        })
+        
+        // Generate recent activity from documents
+        const activity: ActivityItem[] = mapped.slice(0, 5).map((doc, index) => ({
+          id: `doc-${doc.id}`,
+          type: 'upload' as const,
+          description: `Uploaded ${doc.name}`,
+          timestamp: doc.uploadedAt,
+          documentName: doc.name
+        }))
+        setRecentActivity(activity)
+      } else {
         setDocuments([])
         setRecentActivity([])
         setStats({ totalDocuments: 0, totalProcessed: 0, totalSearches: 0, totalChats: 0 })
       }
+    } catch {
+      setDocuments([])
+      setRecentActivity([])
+      setStats({ totalDocuments: 0, totalProcessed: 0, totalSearches: 0, totalChats: 0 })
+    } finally {
+      setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadDocuments()
+    
+    // Set up auto-refresh every 30 seconds
+    const interval = setInterval(loadDocuments, 30000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   const getFileIcon = (type: string) => {
@@ -166,6 +186,16 @@ export default function DashboardPage() {
               <span className="text-xl font-light text-foreground">VoiceLoop</span>
             </div>
             <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="font-light bg-transparent" 
+                onClick={loadDocuments}
+                disabled={loading}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Button>
               <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
                 <Link href="/settings">
                   <Settings className="mr-2 h-4 w-4" />
@@ -264,7 +294,24 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-4">
-              {documents.map((doc) => (
+              {loading && documents.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground font-light">Loading documents...</p>
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground font-light mb-4">No documents uploaded yet</p>
+                  <Button asChild>
+                    <Link href="/upload">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Your First Document
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                documents.map((doc) => (
                 <Card key={doc.id} className="p-6 border-thin hover:border-accent/50 transition-colors">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">{getFileIcon(doc.type)}</div>
@@ -290,9 +337,11 @@ export default function DashboardPage() {
                           <Badge variant="outline" className={`font-light ${getStatusColor(doc.status)}`}>
                             {doc.status}
                           </Badge>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
 
@@ -312,25 +361,32 @@ export default function DashboardPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Clock className="h-4 w-4" />
-                            <span className="font-light">Processed in {doc.processingTime}</span>
+                            <span className="font-light">Uploaded {formatDate(doc.uploadedAt)}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
                               <Link href={`/results/${doc.id}`}>
                                 <Eye className="mr-2 h-4 w-4" />
-                                View
+                                View Document
                               </Link>
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600">
-                              <Trash2 className="h-4 w-4" />
+                            <Button variant="outline" size="sm" className="font-light bg-transparent text-primary border-primary/30 hover:border-primary hover:bg-primary/5" asChild>
+                              <Link href={`/search?docId=${doc.id}`}>
+                                <Search className="mr-2 h-4 w-4" />
+                                Search
+                              </Link>
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                              <Trash2 className="mr-2 h-4 w-4" />
                             </Button>
                           </div>
                         </div>
                       )}
                     </div>
-                  </div>
-                </Card>
-              ))}
+                                      </div>
+                  </Card>
+                ))
+              )}
             </div>
           </div>
 
