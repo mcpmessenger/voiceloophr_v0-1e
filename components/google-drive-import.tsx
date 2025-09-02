@@ -38,7 +38,7 @@ export default function GoogleDriveImport({ open, onClose, onPicked }: GoogleDri
           return
         }
         const params = new URLSearchParams({
-          q: "trashed=false and (mimeType contains 'application/pdf' or mimeType contains 'text/' )",
+          q: "trashed=false and (mimeType contains 'application/pdf' or mimeType contains 'text/' or mimeType contains 'application/vnd.openxmlformats-officedocument' or mimeType contains 'application/msword' or mimeType contains 'application/vnd.ms-excel' or mimeType contains 'application/vnd.ms-powerpoint' or mimeType contains 'application/vnd.google-apps')",
           fields: 'files(id,name,mimeType,modifiedTime,size)',
           pageSize: '25',
         })

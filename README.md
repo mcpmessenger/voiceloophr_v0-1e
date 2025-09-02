@@ -12,9 +12,25 @@
 
 **Visit the deployed VoiceLoop HR Platform:** [https://v0-voice-loop-hr-platform-git-311a9e-peercodeai-7933s-projects.vercel.app/](https://v0-voice-loop-hr-platform-git-311a9e-peercodeai-7933s-projects.vercel.app/)
 
-## 🎉 **NEW: Complete Authentication & Document Storage System!**
+## 🎉 **NEW: Complete Document Processing & Dashboard System!**
 
-VoiceLoop HR now features **enterprise-grade authentication and intelligent document management**:
+VoiceLoop HR now features **comprehensive file type support and intelligent document management**:
+
+### **📄 Universal File Type Support**
+- **Google Workspace** - Docs, Sheets, Slides, Forms
+- **Microsoft Office** - Word (.docx), Excel (.xlsx), PowerPoint (.pptx)
+- **Legacy Office** - .doc, .xls, .ppt files
+- **Text Formats** - PDF, Markdown, CSV, Plain Text
+- **Media Files** - Audio (.wav), Video (.mp4) with Textract integration
+- **Smart Processing** - Automatic file type detection and routing
+
+### **📊 Enhanced Dashboard & Tracking**
+- **Document Persistence** - Cross-session document retention
+- **Dual Storage** - Database + localStorage integration
+- **Real-time Updates** - Auto-refresh and live document tracking
+- **Rich Metadata** - Processing method, word count, file size display
+- **File Type Icons** - Visual file type identification
+- **Activity Tracking** - Upload history and processing status
 
 ### **🔐 Authentication & Security**
 - **Google OAuth Sign-in** - Secure authentication with Google accounts
@@ -37,12 +53,15 @@ VoiceLoop HR now features **enterprise-grade authentication and intelligent docu
 ## 📊 **Current Implementation Status**
 
 ### **✅ Completed Features**
-- **File Upload System**: Drag & drop with multi-format support
-- **Free PDF Parser (Default)**: Robust text extraction using `pdf-parse` (internal entry import)
-- **Smart Processing**: Automatic routing based on file type (PDF/text vs audio)
-- **AI Analysis**: OpenAI integration for document summarization
+- **Universal File Upload**: Drag & drop with comprehensive format support
+- **Multi-Format Processing**: Google Workspace, Microsoft Office, PDF, CSV, audio, video
+- **Smart File Detection**: Automatic file type identification and routing
+- **Advanced Text Extraction**: Mammoth (DOCX), XLSX (Excel), custom PPTX parser
+- **AI Analysis**: OpenAI integration for document summarization and insights
 - **Voice Chat**: Interactive document queries with voice
 - **Whisper STT + ElevenLabs TTS**: Real voice in/out
+- **Enhanced Dashboard**: Document tracking, persistence, and management
+- **Dual Storage System**: Database + localStorage integration
 - **Search Interface**: Document search and retrieval
 - **Responsive UI**: Modern dark theme with Tailwind CSS
 - **Optional Textract**: AWS Textract can be enabled as a paid fallback
@@ -80,14 +99,16 @@ VoiceLoop HR is an intelligent document processing platform that leverages AI to
 - **Modern UI**: Beautiful, responsive interface with Radix UI components
 
 ### 📄 **Document Processing**
-- **PDF Processing (Default)**: Local extraction via `pdf-parse` with quality tuning
-- **Textract (Optional)**: Enterprise-grade OCR fallback when needed
-- **Form Recognition**: Automatic key-value pair extraction from forms
-- **Table Extraction**: Structured data conversion from complex tables
-- **DOCX Support**: Full Word document text extraction
+- **PDF Processing**: Local extraction via `pdf-parse` with quality tuning
+- **Microsoft Word**: Full DOCX support with Mammoth library
+- **Microsoft Excel**: XLSX/XLS parsing with structured data extraction
+- **Microsoft PowerPoint**: PPTX text extraction with custom parser
+- **Google Workspace**: Docs, Sheets, Slides integration
 - **CSV Analysis**: Structured data processing and insights
 - **Markdown Rendering**: Rich text formatting and analysis
 - **Text Files**: Plain text processing and analysis
+- **Audio/Video**: WAV/MP4 support with Textract transcription
+- **Textract (Optional)**: Enterprise-grade OCR fallback when needed
 
 ### 🔐 **Authentication & Security**
 - **Google OAuth**: Secure sign-in with Google accounts
@@ -149,7 +170,10 @@ VoiceLoop HR is an intelligent document processing platform that leverages AI to
 ### **Backend**
 - **Next.js API Routes**: Server-side API endpoints
 - **Node.js**: JavaScript runtime
-- **Document Processing**: Multi-format extraction (PDF via pdf-parse; audio via Whisper)
+- **Document Processing**: Multi-format extraction with FileProcessor class
+- **Mammoth**: DOCX text extraction
+- **XLSX**: Excel file parsing
+- **Custom PPTX Parser**: PowerPoint text extraction
 - **OpenAI Whisper**: Speech-to-text processing
 - **ElevenLabs**: Text-to-speech synthesis
 - **AI Integration**: OpenAI API services
@@ -161,6 +185,28 @@ VoiceLoop HR is an intelligent document processing platform that leverages AI to
 - **TypeScript**: Static type checking
 - **PostCSS**: CSS processing
 - **Jest**: Testing framework
+
+## 📁 **Supported File Types**
+
+### **📄 Document Formats**
+- **PDF** - Text extraction with pdf-parse
+- **Microsoft Word** - .docx (Mammoth), .doc (legacy)
+- **Microsoft Excel** - .xlsx, .xls (XLSX library)
+- **Microsoft PowerPoint** - .pptx, .ppt (custom parser)
+- **Google Workspace** - Docs, Sheets, Slides (via Google Drive API)
+- **CSV** - Structured data processing
+- **Markdown** - .md files with rich formatting
+- **Plain Text** - .txt files
+
+### **🎵 Media Formats**
+- **Audio** - .wav, .mp3 (with Textract transcription)
+- **Video** - .mp4, .avi (with Textract transcription)
+
+### **🔧 Processing Methods**
+- **Direct Text Extraction** - PDF, DOCX, XLSX, PPTX, CSV, TXT, MD
+- **Google Drive Import** - Google Workspace files
+- **Textract Integration** - Audio/video transcription
+- **AI Analysis** - All text content with OpenAI GPT-4
 
 ## 🚀 Getting Started
 
@@ -365,18 +411,23 @@ pnpm lint
 9. ✅ **NEW: Implement real-time STT/TTS capabilities**
 10. ✅ **NEW: Add voice chat interface**
 11. ✅ **NEW: Implement modular architecture for AI management**
+12. ✅ **NEW: Universal file type support (Google Workspace, Microsoft Office)**
+13. ✅ **NEW: Enhanced dashboard with document tracking and persistence**
+14. ✅ **NEW: Dual storage system (Database + localStorage)**
+15. ✅ **NEW: Advanced text extraction for DOCX, XLSX, PPTX files**
 
 ### **🔍 Current Focus**
-1. 🔍 PDF parsing solution research and evaluation
-2. 🏗️ Optimal architecture design and planning
-3. 💰 Cost-benefit analysis and implementation roadmap
+1. ✅ **COMPLETED: Universal file type processing system**
+2. ✅ **COMPLETED: Dashboard document tracking and management**
+3. ✅ **COMPLETED: Cross-session document persistence**
 
 ### **📋 Next Phase**
-1. 🛠️ Implement recommended PDF parsing solution
-2. 🧪 Comprehensive testing and validation
-3. ⚡ Performance optimization and user experience improvements
-4. 📊 Advanced analytics and monitoring
+1. 🧪 Comprehensive testing and validation
+2. ⚡ Performance optimization and user experience improvements
+3. 📊 Advanced analytics and monitoring
+4. 🔄 Document versioning and collaboration features
 
 ---
 
-**🔍 VoiceLoop HR Platform is in research phase for PDF parsing optimization. Current implementation has issues with text extraction quality and processing method confusion. Comprehensive evaluation of parsing solutions in progress to deliver robust, cost-effective document processing.**
+**🎉 VoiceLoop HR Platform now features comprehensive document processing with universal file type support, enhanced dashboard tracking, and cross-session document persistence. The platform successfully handles Google Workspace, Microsoft Office, PDF, CSV, audio, and video files with intelligent processing and AI-powered analysis.**
+     add a document viewr to the right of the 

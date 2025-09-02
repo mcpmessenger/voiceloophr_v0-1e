@@ -11,6 +11,7 @@ import { ArrowLeft, FileText, Mic, Copy, Check, AlertCircle } from "lucide-react
 import { LocalStorageManager } from "@/lib/utils/storage"
 import OpenAISettings from "@/components/OpenAISettings"
 import VoiceChat from "@/components/VoiceChat"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 interface ProcessedFile {
   id: string
@@ -87,7 +88,7 @@ export default function ResultsPage() {
             summary: await generateAISummary(fileData.extractedText, fileData.name),
             transcription: fileData.transcription,
             processedAt: fileData.processingTime || fileData.uploadedAt || new Date().toISOString(),
-            processingMethod: fileData.processingMethod || fileData?.metadata?.processingMethod || 'fixed-pdf-parser',
+            processingMethod: fileData.processingMethod || 'fixed-pdf-parser',
           }
 
           setFileData(realData)
@@ -105,7 +106,7 @@ export default function ResultsPage() {
             summary: `**Document Summary: ${fileData.name}**\n\n**Status:** Document processed with limited content\n\n**Note:** This document was processed but contains limited or fallback content. Please try uploading a different version of the document.`,
             transcription: fileData.transcription,
             processedAt: fileData.processingTime || fileData.uploadedAt || new Date().toISOString(),
-            processingMethod: fileData.processingMethod || fileData?.metadata?.processingMethod,
+            processingMethod: fileData.processingMethod || 'fallback',
           }
 
           setFileData(fallbackData)
@@ -208,7 +209,7 @@ export default function ResultsPage() {
     }
 
     // Production: Only OpenAI analysis, no fallbacks
-    return `**Document Summary: ${fileName}**\n\n**Status: AI Analysis Optional**\n\n**Current State:**\n• Document text extracted successfully using Free PDF Parser\n• AI insights pending (requires OpenAI API key)\n\n**Next Steps:**\n• Add OpenAI API key in Settings (optional)\n• Re-run AI analysis for summaries and insights\n\n**Note:** PDF text extraction does not require any API key.`
+    return `**Document Summary: ${fileName}**\n\n**Status: AI Analysis Required**\n\n**Current State:**\n• Document text extracted successfully via AWS Textract\n• AI analysis pending - OpenAI API key required\n\n**Next Steps:**\n• Configure OpenAI API key in Settings\n• Re-process document for AI insights\n• Contact administrator if issues persist\n\n**Note:** This is a production system requiring OpenAI integration for document analysis.`
   }
 
   const copyToClipboard = async (text: string) => {
@@ -329,124 +330,38 @@ export default function ResultsPage() {
 
       {/* Results Content */}
       <section className="py-8 px-6">
-        <div className="container mx-auto max-w-4xl">
-          {/* File Info */}
-          <div className="mb-8">
-            <div className="flex items-center gap-4 mb-4">
-              <FileText className="h-8 w-8 text-primary drop-shadow-lg" />
-              <div>
-                <h1 className="text-2xl font-light text-foreground">{fileData.name}</h1>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground font-light">
-                  <span>{formatFileSize(fileData.size)}</span>
-                  <Badge variant="outline" className="font-light border-2 border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-200">
-                    {fileData.type.split("/")[1]?.toUpperCase() || "FILE"}
-                  </Badge>
-                  <span>Processed {new Date(fileData.processedAt).toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Processing Details */}
-            {fileData.extractedText && (
-              <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-primary">Processing Complete</span>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Words:</span>
-                    <span className="ml-2 font-medium text-foreground">
-                      {fileData.extractedText.split(/\s+/).filter(word => word.length > 0).length}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Characters:</span>
-                    <span className="ml-2 font-medium text-foreground">
-                      {fileData.extractedText.length}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Processing:</span>
-                    <span className="ml-2 font-medium text-foreground">
-                      {fileData.processingMethod === 'fixed-pdf-parser' ? 'Free PDF Parser' : (fileData.processingMethod || '—')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="container mx-auto max-w-6xl">
+          {/* Use the new DocumentViewer component */}
+          <DocumentViewer
+            document={{
+              id: fileData.id,
+              name: fileData.name,
+              type: fileData.type,
+              size: fileData.size,
+              extractedText: fileData.extractedText,
+              summary: fileData.summary,
+              transcription: fileData.transcription,
+              processedAt: fileData.processedAt,
+              processingMethod: fileData.processingMethod,
+              userId: undefined
+            }}
+            onViewInDashboard={() => {
+              // Navigate to dashboard
+              window.location.href = '/dashboard'
+            }}
+            onStartVoiceChat={() => setIsVoiceChatOpen(true)}
+          />
 
-          <div className="grid gap-8">
-            {/* Summary */}
-            <Card className="p-6 border-2 border-primary/20 hover:border-primary/30 transition-colors duration-200 shadow-sm hover:shadow-md">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-light">AI Summary</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
-                  onClick={() => copyToClipboard(fileData.summary)}
-                  disabled={!isBrowser}
-                >
-                  {copied ? <Check className="mr-2 h-4 w-4 text-green-600" /> : <Copy className="mr-2 h-4 w-4 text-primary" />}
-                  {copied ? "Copied!" : "Copy"}
-                </Button>
-              </div>
-              <div className="prose prose-sm max-w-none">
-                <div className="whitespace-pre-wrap text-sm font-light leading-relaxed">{fileData.summary}</div>
-              </div>
-            </Card>
-
-            {/* Transcription (if audio/video) */}
-            {fileData.transcription && (
-              <Card className="p-6 border-2 border-primary/20 hover:border-primary/30 transition-colors duration-200 shadow-sm hover:shadow-md">
-                <div className="flex items-center gap-3 mb-4">
-                  <Mic className="h-5 w-5 text-primary drop-shadow-sm" />
-                  <h2 className="text-xl font-light">Transcription</h2>
-                </div>
-                <div className="text-sm font-light leading-relaxed text-muted-foreground">{fileData.transcription}</div>
-              </Card>
-            )}
-
-            {/* Extracted Text */}
-            <Card className="p-6 border-2 border-primary/20 hover:border-primary/30 transition-colors duration-200 shadow-sm hover:shadow-md">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-light">Extracted Content</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
-                  onClick={() => copyToClipboard(fileData.extractedText)}
-                  disabled={!isBrowser}
-                >
-                  <Copy className="mr-2 h-4 w-4 text-primary" />
-                  Copy Text
-                </Button>
-              </div>
-              <div className="text-sm font-light leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                {fileData.extractedText}
-              </div>
-            </Card>
-
-            {/* OpenAI Settings - Only show if user opens voice chat and no key configured */}
-            {typeof window !== 'undefined' && isVoiceChatOpen && !localStorage.getItem('voiceloop_openai_key') && (
+          {/* OpenAI Settings - Only show if user opens voice chat and no key configured */}
+          {typeof window !== 'undefined' && isVoiceChatOpen && !localStorage.getItem('voiceloop_openai_key') && (
+            <div className="mt-8">
               <OpenAISettings />
-            )}
-
-            {/* Actions */}
-            <div className="flex justify-center">
-              <Button 
-                size="lg" 
-                className="font-light bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 px-8"
-                onClick={() => setIsVoiceChatOpen(true)}
-                disabled={!fileData?.extractedText}
-              >
-                <Mic className="mr-2 h-5 w-5 text-primary-foreground" />
-                Start Voice Chat
-              </Button>
             </div>
-          </div>
+          )}
+
+
+
+
         </div>
       </section>
 
