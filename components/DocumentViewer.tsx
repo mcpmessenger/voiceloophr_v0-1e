@@ -169,7 +169,7 @@ export function DocumentViewer({
       {/* Document Content Tabs */}
       <Card className="border-2 border-primary/20">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-primary/5 border-b border-primary/20">
+          <TabsList className="grid w-full grid-cols-5 bg-primary/5 border-b border-primary/20">
             <TabsTrigger value="summary" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="mr-2 h-4 w-4" />
               Summary
@@ -184,6 +184,10 @@ export function DocumentViewer({
                 Audio
               </TabsTrigger>
             )}
+            <TabsTrigger value="viewer" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <FileText className="mr-2 h-4 w-4" />
+              Document Viewer
+            </TabsTrigger>
             <TabsTrigger value="metadata" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Search className="mr-2 h-4 w-4" />
               Details
@@ -264,6 +268,83 @@ export function DocumentViewer({
               </div>
             </TabsContent>
           )}
+
+          {/* Document Viewer Tab */}
+          <TabsContent value="viewer" className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-light text-foreground">Document Viewer</h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary"
+                  onClick={() => copyToClipboard(document.extractedText, 'viewer')}
+                >
+                  {copied === 'viewer' ? <Check className="mr-2 h-4 w-4 text-green-600" /> : <Copy className="mr-2 h-4 w-4" />}
+                  {copied === 'viewer' ? "Copied!" : "Copy"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download
+                </Button>
+              </div>
+            </div>
+            
+            {/* Document Preview */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+              <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">{document.name}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {document.type} • {formatFileSize(document.size)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900 dark:text-gray-100">
+                    {document.extractedText}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Document Stats */}
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-muted/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-light text-primary">
+                  {document.extractedText.split(/\s+/).filter(word => word.length > 0).length}
+                </div>
+                <div className="text-xs text-muted-foreground">Words</div>
+              </div>
+              <div className="bg-muted/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-light text-primary">
+                  {document.extractedText.length}
+                </div>
+                <div className="text-xs text-muted-foreground">Characters</div>
+              </div>
+              <div className="bg-muted/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-light text-primary">
+                  {getProcessingMethodLabel(document.processingMethod)}
+                </div>
+                <div className="text-xs text-muted-foreground">Method</div>
+              </div>
+              <div className="bg-muted/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-light text-primary">
+                  {formatDate(document.processedAt)}
+                </div>
+                <div className="text-xs text-muted-foreground">Processed</div>
+              </div>
+            </div>
+          </TabsContent>
 
           {/* Metadata Tab */}
           <TabsContent value="metadata" className="p-6">

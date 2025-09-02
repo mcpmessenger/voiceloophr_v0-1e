@@ -16,7 +16,7 @@ export default function OpenAISettings() {
 
   useEffect(() => {
     // Load API key from localStorage on component mount
-    const savedKey = localStorage.getItem('openai_api_key')
+    const savedKey = localStorage.getItem('voiceloop_openai_key')
     if (savedKey) {
       setApiKey(savedKey)
       setIsValid(true)
@@ -36,7 +36,7 @@ export default function OpenAISettings() {
       }
 
       // Save locally for fallback
-      localStorage.setItem('openai_api_key', apiKey)
+      localStorage.setItem('voiceloop_openai_key', apiKey)
       setIsValid(true)
 
       // If signed in, persist to server
@@ -77,7 +77,7 @@ export default function OpenAISettings() {
   }
 
   const handleRemoveKey = () => {
-    localStorage.removeItem('openai_api_key')
+    localStorage.removeItem('voiceloop_openai_key')
     setApiKey('')
     setIsValid(false)
   }

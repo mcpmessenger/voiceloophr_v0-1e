@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2, Eye } from "lucide-react"
 import GoogleDriveImport from '@/components/google-drive-import'
+import FileTypeInfo from '@/components/file-type-info'
 
 interface UploadedFile {
   id: string
@@ -26,9 +27,25 @@ interface UploadedFile {
 }
 
 const ACCEPTED_FILE_TYPES = {
-  "application/pdf": [".pdf"],
+  // Google Workspace
+  "application/vnd.google-apps.document": [".gdoc"],
+  "application/vnd.google-apps.spreadsheet": [".gsheet"],
+  "application/vnd.google-apps.presentation": [".gslides"],
+  // Microsoft Office
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
+  // Legacy Office
+  "application/msword": [".doc"],
+  "application/vnd.ms-excel": [".xls"],
+  "application/vnd.ms-powerpoint": [".ppt"],
+  // Text formats
+  "text/plain": [".txt"],
   "text/markdown": [".md"],
   "text/csv": [".csv"],
+  // PDF
+  "application/pdf": [".pdf"],
+  // Audio/Video
   "audio/wav": [".wav"],
   "video/mp4": [".mp4"],
 }
@@ -308,50 +325,128 @@ export default function UploadPage() {
           return
         }
         
-        // For images, we need to extract text first before AI processing
-        if (uploadedFile.file.type.includes('image')) {
-          setFiles((prev) => prev.map((f) => f.id === fileId ? { 
-            ...f, 
-            status: "completed", 
-            progress: 100,
-            warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
-            showTextractButton: true
-          } : f))
-          
-          toast("Image uploaded. Click 'Process with Textract' to extract text content.")
-          return
-        }
+                 // For images, we need to extract text first before AI processing
+         if (uploadedFile.file.type.includes('image')) {
+           setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+             ...f, 
+             status: "completed", 
+             progress: 100,
+             warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
+             showTextractButton: true
+           } : f))
+           
+           toast("Image uploaded. Click 'Process with Textract' to extract text content.")
+           return
+         }
+         
+         // For CSV files, process directly with our file processor
+         if (uploadedFile.file.type.includes('csv') || uploadedFile.file.name.toLowerCase().includes('.csv')) {
+           // CSV files will be processed by our FileProcessor
+           // Continue to the processing section below
+         }
+         // For audio/video files, we need to extract text first before AI processing
+         else if (uploadedFile.file.type.includes('audio') || uploadedFile.file.type.includes('video')) {
+           setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+             ...f, 
+             status: "completed", 
+             progress: 100,
+             warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
+             showTextractButton: true
+           } : f))
+           
+           toast("Audio/Video uploaded. Click 'Process with Textract' to extract text content.")
+           return
+         }
 
-      // Process file with AI with timeout
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-      
-      const processResponse = await fetch("/api/process", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fileId: uploadResult.fileId,
-          openaiKey,
-        }),
-        signal: controller.signal,
-      })
-      
-      clearTimeout(timeoutId)
+             // Process file with our new file processor
+       const processFormData = new FormData()
+       processFormData.append('file', uploadedFile.file)
+       
+       const processResponse = await fetch("/api/process-file", {
+         method: "POST",
+         body: processFormData,
+       })
+       
+       if (!processResponse.ok) {
+         const errorData = await processResponse.json().catch(() => ({}))
+         const errorMessage = errorData.details || errorData.error || "Processing failed"
+         throw new Error(errorMessage)
+       }
+       
+       const processResult = await processResponse.json()
+       
+       // Update localStorage with processed content
+       try {
+         const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+         if (existing[uploadResult.fileId]) {
+           existing[uploadResult.fileId] = {
+             ...existing[uploadResult.fileId],
+             extractedText: processResult.content,
+             wordCount: processResult.metadata.wordCount,
+             processed: true,
+             processingMethod: processResult.metadata.processingMethod,
+             processingTime: new Date().toISOString(),
+             metadata: {
+               ...existing[uploadResult.fileId].metadata,
+               processingMethod: processResult.metadata.processingMethod,
+               confidence: processResult.metadata.confidence,
+               note: `Text extracted using ${processResult.metadata.processingMethod}`
+             }
+           }
+           localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+         }
+       } catch (error) {
+         console.warn('Failed to update localStorage:', error)
+       }
 
-      if (!processResponse.ok) {
-        throw new Error("Processing failed")
-      }
+       // Save to database if available
+       try {
+         const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
+         const supabase = getSupabaseBrowser()
+         let userId = null
+         
+         if (supabase) {
+           const { data: { user } } = await supabase.auth.getUser()
+           userId = user?.id
+         }
 
-      // Mark as completed
-      setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "completed", progress: 100 } : f)))
-      
-      // Automatically redirect to results page after successful processing
-      toast.success("Document processed successfully! Redirecting to results...")
-      setTimeout(() => {
-        router.push(`/results/${uploadResult.fileId}`)
-      }, 1500)
+         const saveResponse = await fetch('/api/documents/save', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({
+             id: uploadResult.fileId,
+             name: uploadedFile.file.name,
+             type: uploadedFile.file.type,
+             size: uploadedFile.file.size,
+             extractedText: processResult.content,
+             summary: '', // Will be generated later
+             processingMethod: processResult.metadata.processingMethod,
+             userId: userId
+           })
+         })
+
+         if (saveResponse.ok) {
+           console.log('Document saved to database successfully')
+         } else {
+           console.warn('Failed to save document to database:', await saveResponse.text())
+         }
+       } catch (dbError) {
+         console.warn('Database save failed (continuing with localStorage):', dbError)
+       }
+
+             // Mark as completed
+       setFiles((prev) => prev.map((f) => (f.id === fileId ? { 
+         ...f, 
+         status: "completed", 
+         progress: 100,
+         warning: `Text extracted successfully using ${processResult.metadata.processingMethod} - ${processResult.metadata.wordCount} words`
+       } : f)))
+       
+       // Automatically redirect to results page after successful processing
+       toast.success(`Document processed successfully! Extracted ${processResult.metadata.wordCount} words using ${processResult.metadata.processingMethod}. Redirecting to results...`)
+       setTimeout(() => {
+         router.push(`/results/${uploadResult.fileId}`)
+       }, 1500)
     } catch (error) {
       console.error("File processing error:", error)
       let errorMessage = "Processing failed"
@@ -724,9 +819,36 @@ export default function UploadPage() {
   }
 
   const getFileIcon = (file: File) => {
-    if (file.type.includes("pdf")) return <FileText className="h-6 w-6 text-red-500 drop-shadow-sm" />
-    if (file.type.includes("audio")) return <Music className="h-6 w-6 text-blue-500 drop-shadow-sm" />
-    if (file.type.includes("video")) return <Video className="h-6 w-6 text-purple-500 drop-shadow-sm" />
+    const fileName = file.name.toLowerCase()
+    const fileType = file.type.toLowerCase()
+    
+    // Google Workspace
+    if (fileName.includes('.gdoc')) return <FileText className="h-6 w-6 text-blue-600 drop-shadow-sm" />
+    if (fileName.includes('.gsheet')) return <FileText className="h-6 w-6 text-green-600 drop-shadow-sm" />
+    if (fileName.includes('.gslides')) return <FileText className="h-6 w-6 text-orange-600 drop-shadow-sm" />
+    
+    // Microsoft Office
+    if (fileName.includes('.docx') || fileType.includes('wordprocessingml')) return <FileText className="h-6 w-6 text-blue-700 drop-shadow-sm" />
+    if (fileName.includes('.xlsx') || fileType.includes('spreadsheetml')) return <FileText className="h-6 w-6 text-green-700 drop-shadow-sm" />
+    if (fileName.includes('.pptx') || fileType.includes('presentationml')) return <FileText className="h-6 w-6 text-orange-700 drop-shadow-sm" />
+    
+    // Legacy Office
+    if (fileName.includes('.doc') || fileType.includes('msword')) return <FileText className="h-6 w-6 text-blue-500 drop-shadow-sm" />
+    if (fileName.includes('.xls') || fileType.includes('ms-excel')) return <FileText className="h-6 w-6 text-green-500 drop-shadow-sm" />
+    if (fileName.includes('.ppt') || fileType.includes('ms-powerpoint')) return <FileText className="h-6 w-6 text-orange-500 drop-shadow-sm" />
+    
+    // Text formats
+    if (fileName.includes('.txt') || fileType.includes('text/')) return <FileText className="h-6 w-6 text-gray-600 drop-shadow-sm" />
+    if (fileName.includes('.md') || fileType.includes('markdown')) return <FileText className="h-6 w-6 text-purple-600 drop-shadow-sm" />
+    if (fileName.includes('.csv') || fileType.includes('csv')) return <FileText className="h-6 w-6 text-green-600 drop-shadow-sm" />
+    
+    // PDF
+    if (fileName.includes('.pdf') || fileType.includes('pdf')) return <FileText className="h-6 w-6 text-red-500 drop-shadow-sm" />
+    
+    // Audio/Video
+    if (fileType.includes("audio")) return <Music className="h-6 w-6 text-blue-500 drop-shadow-sm" />
+    if (fileType.includes("video")) return <Video className="h-6 w-6 text-purple-500 drop-shadow-sm" />
+    
     return <File className="h-6 w-6 text-primary drop-shadow-sm" />
   }
 
@@ -790,11 +912,11 @@ export default function UploadPage() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-light text-foreground mb-4 text-balance">Upload Your Documents</h1>
           <p className="text-lg text-muted-foreground font-light text-pretty">
-            Drag and drop your files or click to browse. We support PDF, Markdown, CSV, audio, and video files.
+            Drag and drop your files or click to browse. We support Google Workspace, Microsoft Office, PDF, Markdown, CSV, audio, and video files.
           </p>
         </div>
 
-        {/* Upload Zone */}
+                {/* Upload Zone */}
         <Card className="mb-8">
           <div
             {...getRootProps()}
@@ -813,7 +935,7 @@ export default function UploadPage() {
                     Drag and drop your files here, or click to browse
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Supports PDF, Markdown, CSV, WAV, MP4 • Max 50MB per file
+                    Supports Google Workspace, Microsoft Office, PDF, Markdown, CSV, WAV, MP4 • Max 50MB per file
                   </p>
                   <div className="mt-4 flex items-center justify-center gap-2 text-sm">
                     <input
@@ -833,6 +955,11 @@ export default function UploadPage() {
             <Button variant="outline" className="font-light" onClick={() => setDriveOpen(true)}>Import from Google Drive</Button>
           </div>
         </Card>
+
+        {/* File Type Information */}
+        <div className="mb-8">
+          <FileTypeInfo />
+        </div>
 
         {/* File List */}
         {files.length > 0 && (

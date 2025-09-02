@@ -72,41 +72,70 @@ export default function DashboardPage() {
 
       const res = await fetch(`/api/documents${userIdParam}`)
       const data = await res.json().catch(() => ({}))
+      
+      let dbDocuments: Document[] = []
       if (res.ok && Array.isArray(data.documents)) {
-        const mapped: Document[] = data.documents.map((d: any) => ({
+        dbDocuments = data.documents.map((d: any) => ({
           id: d.id,
           name: d.file_name || 'Document',
           type: d.mime_type || 'text/plain',
           size: d.file_size || (d.content ? d.content.length : 0),
-          status: 'completed',
+          status: 'completed' as const,
           uploadedAt: d.uploaded_at,
           lastAccessed: undefined,
           summary: undefined,
           processingTime: undefined,
         }))
-        setDocuments(mapped)
-        setStats({
-          totalDocuments: mapped.length,
-          totalProcessed: mapped.length,
-          totalSearches: 0,
-          totalChats: 0,
-        })
-        
-        // Generate recent activity from documents
-        const activity: ActivityItem[] = mapped.slice(0, 5).map((doc, index) => ({
-          id: `doc-${doc.id}`,
-          type: 'upload' as const,
-          description: `Uploaded ${doc.name}`,
-          timestamp: doc.uploadedAt,
-          documentName: doc.name
-        }))
-        setRecentActivity(activity)
-      } else {
-        setDocuments([])
-        setRecentActivity([])
-        setStats({ totalDocuments: 0, totalProcessed: 0, totalSearches: 0, totalChats: 0 })
       }
-    } catch {
+
+      // Also load documents from localStorage as fallback/supplement
+      let localStorageDocuments: Document[] = []
+      try {
+        const { LocalStorageManager } = await import('@/lib/utils/storage')
+        const allFiles = LocalStorageManager.getAllFiles()
+        
+        localStorageDocuments = Object.values(allFiles).map((file: any) => ({
+          id: file.id,
+          name: file.name || 'Document',
+          type: file.type || 'text/plain',
+          size: file.size || 0,
+          status: file.processed ? 'completed' as const : 'processing' as const,
+          uploadedAt: file.uploadedAt || file.processingTime || new Date().toISOString(),
+          lastAccessed: undefined,
+          summary: file.extractedText ? file.extractedText.substring(0, 200) + '...' : undefined,
+          processingTime: file.processingTime,
+        }))
+      } catch (localError) {
+        console.warn('Failed to load localStorage documents:', localError)
+      }
+
+      // Combine and deduplicate documents (prioritize database over localStorage)
+      const allDocuments = [...dbDocuments, ...localStorageDocuments.filter(localDoc => 
+        !dbDocuments.some(dbDoc => dbDoc.id === localDoc.id)
+      )]
+
+      // Sort by upload date
+      allDocuments.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+
+      setDocuments(allDocuments)
+      setStats({
+        totalDocuments: allDocuments.length,
+        totalProcessed: allDocuments.filter(d => d.status === 'completed').length,
+        totalSearches: 0,
+        totalChats: 0,
+      })
+      
+      // Generate recent activity from documents
+      const activity: ActivityItem[] = allDocuments.slice(0, 5).map((doc) => ({
+        id: `doc-${doc.id}`,
+        type: 'upload' as const,
+        description: `Uploaded ${doc.name}`,
+        timestamp: doc.uploadedAt,
+        documentName: doc.name
+      }))
+      setRecentActivity(activity)
+    } catch (error) {
+      console.error('Failed to load documents:', error)
       setDocuments([])
       setRecentActivity([])
       setStats({ totalDocuments: 0, totalProcessed: 0, totalSearches: 0, totalChats: 0 })
@@ -124,10 +153,42 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const getFileIcon = (type: string) => {
+  const getFileIcon = (type: string, name?: string) => {
+    const fileName = name?.toLowerCase() || ''
+    
+    // Google Workspace files
+    if (type.includes('google-apps') || fileName.includes('google')) {
+      return <FileText className="h-5 w-5 text-blue-500" />
+    }
+    
+    // Microsoft Office files
+    if (type.includes('msword') || type.includes('wordprocessingml') || fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+      return <FileText className="h-5 w-5 text-blue-600" />
+    }
+    if (type.includes('spreadsheetml') || type.includes('ms-excel') || fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      return <FileText className="h-5 w-5 text-green-600" />
+    }
+    if (type.includes('presentationml') || type.includes('ms-powerpoint') || fileName.endsWith('.pptx') || fileName.endsWith('.ppt')) {
+      return <FileText className="h-5 w-5 text-orange-600" />
+    }
+    
+    // Text and document files
     if (type.includes("pdf")) return <FileText className="h-5 w-5 text-red-500" />
-    if (type.includes("audio")) return <Music className="h-5 w-5 text-purple-500" />
-    if (type.includes("video")) return <Video className="h-5 w-5 text-orange-500" />
+    if (type.includes("text") || fileName.endsWith('.txt') || fileName.endsWith('.md')) {
+      return <FileText className="h-5 w-5 text-gray-600" />
+    }
+    if (fileName.endsWith('.csv')) {
+      return <FileText className="h-5 w-5 text-green-500" />
+    }
+    
+    // Media files
+    if (type.includes("audio") || fileName.endsWith('.wav') || fileName.endsWith('.mp3')) {
+      return <Music className="h-5 w-5 text-purple-500" />
+    }
+    if (type.includes("video") || fileName.endsWith('.mp4') || fileName.endsWith('.avi')) {
+      return <Video className="h-5 w-5 text-orange-500" />
+    }
+    
     return <File className="h-5 w-5 text-blue-500" />
   }
 
@@ -314,7 +375,7 @@ export default function DashboardPage() {
                 documents.map((doc) => (
                 <Card key={doc.id} className="p-6 border-thin hover:border-accent/50 transition-colors">
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">{getFileIcon(doc.type)}</div>
+                    <div className="flex-shrink-0">{getFileIcon(doc.type, doc.name)}</div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4 mb-2">

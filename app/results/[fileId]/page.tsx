@@ -137,7 +137,7 @@ export default function ResultsPage() {
     }
 
     try {
-      const openaiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || localStorage.getItem('openai_api_key')
+      const openaiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || localStorage.getItem('voiceloop_openai_key')
       
       if (openaiKey) {
         console.log('🚀 Attempting OpenAI analysis...')
