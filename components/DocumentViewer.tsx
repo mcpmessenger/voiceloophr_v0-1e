@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,8 +17,29 @@ import {
   Bookmark,
   Calendar,
   User,
-  Hash
+  Hash,
+  RotateCw, 
+  ZoomIn, 
+  ZoomOut, 
+  ChevronLeft, 
+  ChevronRight, 
+  AlertCircle, 
+  Music, 
+  Video as VideoIcon
 } from "lucide-react"
+import { ActualDocumentViewer } from "./actual-document-viewer"
+import dynamic from 'next/dynamic'
+
+// Create a client-side only PDF viewer component
+const ClientPDFViewer = dynamic(() => import('./ClientPDFViewer'), { 
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+      <p className="text-lg">Loading PDF viewer...</p>
+    </div>
+  )
+})
 
 interface DocumentViewerProps {
   document: {
@@ -44,6 +65,9 @@ export function DocumentViewer({
 }: DocumentViewerProps) {
   const [copied, setCopied] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("summary")
+  const [actualViewerOpen, setActualViewerOpen] = useState(false)
+  const [fileData, setFileData] = useState<string | null>(null)
+  const [loadingFileData, setLoadingFileData] = useState(false)
 
   const copyToClipboard = async (text: string, type: string) => {
     try {
@@ -86,6 +110,38 @@ export function DocumentViewer({
       case 'whisper': return 'OpenAI Whisper'
       default: return method || 'Unknown'
     }
+  }
+
+  const fetchFileData = async (fileId: string) => {
+    try {
+      setLoadingFileData(true)
+      const response = await fetch(`/api/files/${fileId}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch file data')
+      }
+      
+      const result = await response.json()
+      if (result.success && result.file?.buffer) {
+        setFileData(result.file.buffer)
+        return result.file.buffer
+      } else {
+        throw new Error('No file data available')
+      }
+    } catch (error) {
+      console.error('Error fetching file data:', error)
+      setFileData(null)
+      return null
+    } finally {
+      setLoadingFileData(false)
+    }
+  }
+
+  const handleOpenDocumentViewer = async () => {
+    if (!fileData) {
+      await fetchFileData(document.id)
+    }
+    setActualViewerOpen(true)
   }
 
   return (
@@ -281,7 +337,7 @@ export function DocumentViewer({
                   onClick={() => copyToClipboard(document.extractedText, 'viewer')}
                 >
                   {copied === 'viewer' ? <Check className="mr-2 h-4 w-4 text-green-600" /> : <Copy className="mr-2 h-4 w-4" />}
-                  {copied === 'viewer' ? "Copied!" : "Copy"}
+                  {copied === 'viewer' ? "Copied!" : "Copy Text"}
                 </Button>
                 <Button
                   variant="outline"
@@ -294,8 +350,8 @@ export function DocumentViewer({
               </div>
             </div>
             
-            {/* Document Preview */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+            {/* Integrated Document Viewer */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm min-h-[600px]">
               <div className="border-b border-gray-200 dark:border-gray-700 p-4">
                 <div className="flex items-center gap-3">
                   <FileText className="h-5 w-5 text-blue-500" />
@@ -308,40 +364,13 @@ export function DocumentViewer({
                 </div>
               </div>
               
-              <div className="p-6">
-                <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900 dark:text-gray-100">
-                    {document.extractedText}
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Document Stats */}
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-muted/20 rounded-lg p-4 text-center">
-                <div className="text-2xl font-light text-primary">
-                  {document.extractedText.split(/\s+/).filter(word => word.length > 0).length}
-                </div>
-                <div className="text-xs text-muted-foreground">Words</div>
-              </div>
-              <div className="bg-muted/20 rounded-lg p-4 text-center">
-                <div className="text-2xl font-light text-primary">
-                  {document.extractedText.length}
-                </div>
-                <div className="text-xs text-muted-foreground">Characters</div>
-              </div>
-              <div className="bg-muted/20 rounded-lg p-4 text-center">
-                <div className="text-2xl font-light text-primary">
-                  {getProcessingMethodLabel(document.processingMethod)}
-                </div>
-                <div className="text-xs text-muted-foreground">Method</div>
-              </div>
-              <div className="bg-muted/20 rounded-lg p-4 text-center">
-                <div className="text-2xl font-light text-primary">
-                  {formatDate(document.processedAt)}
-                </div>
-                <div className="text-xs text-muted-foreground">Processed</div>
+              <div className="p-6 h-full">
+                <DocumentViewerContent 
+                  document={document}
+                  fileData={fileData}
+                  loadingFileData={loadingFileData}
+                  onLoadFileData={() => fetchFileData(document.id)}
+                />
               </div>
             </div>
           </TabsContent>
@@ -422,6 +451,168 @@ export function DocumentViewer({
           View in Dashboard
         </Button>
       </div>
+
+      {/* Actual Document Viewer Modal */}
+      <ActualDocumentViewer
+        document={{
+          id: document.id,
+          name: document.name,
+          type: document.type,
+          size: document.size,
+          extractedText: document.extractedText,
+          fileData: fileData || undefined, // Pass the base64 file data
+        }}
+        isOpen={actualViewerOpen}
+        onClose={() => setActualViewerOpen(false)}
+      />
+    </div>
+  )
+}
+
+// Document Viewer Content Component
+interface DocumentViewerContentProps {
+  document: {
+    id: string
+    name: string
+    type: string
+    size: number
+    extractedText: string
+  }
+  fileData: string | null
+  loadingFileData: boolean
+  onLoadFileData: () => void
+}
+
+function DocumentViewerContent({ 
+  document, 
+  fileData, 
+  loadingFileData, 
+  onLoadFileData 
+}: DocumentViewerContentProps) {
+  const [numPages, setNumPages] = useState<number | null>(null)
+  const [pageNumber, setPageNumber] = useState(1)
+  const [scale, setScale] = useState(1.0)
+  const [rotation, setRotation] = useState(0)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    if (!fileData) {
+      setNumPages(null)
+      setPageNumber(1)
+      setScale(1.0)
+      setRotation(0)
+      setPdfError(null)
+    }
+  }, [fileData])
+
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
+    setNumPages(numPages)
+    setPageNumber(1)
+    setPdfError(null)
+  }
+
+  function onDocumentLoadError(error: any) {
+    console.error('Error loading PDF document:', error)
+    setPdfError('Failed to load PDF document. It might be corrupted or unsupported.')
+  }
+
+  const changePage = (offset: number) => {
+    setPageNumber(prevPageNumber => {
+      if (numPages === null) return prevPageNumber
+      return Math.max(1, Math.min(prevPageNumber + offset, numPages))
+    })
+  }
+
+  const zoomIn = () => setScale(prevScale => Math.min(prevScale + 0.1, 3.0))
+  const zoomOut = () => setScale(prevScale => Math.max(prevScale - 0.1, 0.5))
+  const rotate = () => setRotation(prevRotation => (prevRotation + 90) % 360)
+
+  const fileUrl = fileData ? `data:${document.type};base64,${fileData}` : null
+
+  const renderContent = () => {
+    if (!fileData && !loadingFileData) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+          <AlertCircle className="h-12 w-12 mb-4" />
+          <p className="text-lg mb-2">Document not loaded</p>
+          <p className="text-sm mb-4">Click the button below to load the original document.</p>
+          <Button
+            onClick={onLoadFileData}
+            className="font-light bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            Load Document
+          </Button>
+        </div>
+      )
+    }
+
+    if (loadingFileData) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg">Loading document...</p>
+        </div>
+      )
+    }
+
+    if (!fileUrl) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+          <AlertCircle className="h-12 w-12 mb-4" />
+          <p className="text-lg">No file data available for preview.</p>
+          <p className="text-sm">Please ensure the file was uploaded correctly.</p>
+        </div>
+      )
+    }
+
+    if (document.type.includes("pdf")) {
+      return (
+        <ClientPDFViewer 
+          fileData={fileData}
+          document={document}
+        />
+      )
+    } else if (document.type.startsWith("image/")) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full">
+          <img src={fileUrl} alt={document.name} className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg" />
+        </div>
+      )
+    } else if (document.type.startsWith("audio/")) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full">
+          <Music className="h-16 w-16 text-primary mb-4" />
+          <audio controls src={fileUrl} className="w-full max-w-md"></audio>
+          <p className="text-sm text-muted-foreground mt-2">Audio file preview</p>
+        </div>
+      )
+    } else if (document.type.startsWith("video/")) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full">
+          <VideoIcon className="h-16 w-16 text-primary mb-4" />
+          <video controls src={fileUrl} className="w-full max-w-xl rounded-lg shadow-lg"></video>
+          <p className="text-sm text-muted-foreground mt-2">Video file preview</p>
+        </div>
+      )
+    } else {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+          <FileText className="h-12 w-12 mb-4" />
+          <p className="text-lg">Unsupported file type for direct preview.</p>
+          <p className="text-sm">Extracted text is available in the "Content" tab.</p>
+        </div>
+      )
+    }
+  }
+
+  return (
+    <div className="h-full">
+      {renderContent()}
     </div>
   )
 }

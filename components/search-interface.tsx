@@ -45,7 +45,22 @@ export default function SearchInterface() {
     setHasSearched(true)
 
     try {
-      // No client key required for semantic search; server uses its own key
+      // Check if we're in guest mode (no Supabase configured)
+      let isGuestMode = false
+      try {
+        const supabase = getSupabaseBrowser()
+        if (!supabase) {
+          isGuestMode = true
+        }
+      } catch {
+        isGuestMode = true
+      }
+
+      if (isGuestMode) {
+        // Handle guest mode search on client side
+        await handleGuestModeSearch(query)
+        return
+      }
 
       // Include userId if signed in
       let userId: string | undefined
@@ -83,6 +98,71 @@ export default function SearchInterface() {
       setTotalResults(0)
     } finally {
       setIsSearching(false)
+    }
+  }
+
+  const handleGuestModeSearch = async (query: string) => {
+    try {
+      // Get chunks from localStorage
+      const storedChunks = JSON.parse(localStorage.getItem('voiceloop_guest_chunks') || '[]')
+      
+      if (storedChunks.length === 0) {
+        setResults([])
+        setTotalResults(0)
+        setSearchTime("")
+        return
+      }
+
+      // Simple text-based search for guest mode
+      const queryLower = query.toLowerCase()
+      const results: any[] = []
+
+      for (const chunk of storedChunks) {
+        const chunkText = chunk.chunkText || chunk.chunk_text || ''
+        const chunkLower = chunkText.toLowerCase()
+        
+        // Calculate simple relevance score based on text matching
+        let score = 0
+        const words = queryLower.split(' ').filter(word => word.length > 2)
+        
+        for (const word of words) {
+          if (chunkLower.includes(word)) {
+            score += 1
+          }
+        }
+        
+        // Normalize score
+        const relevanceScore = words.length > 0 ? score / words.length : 0
+        
+        if (relevanceScore >= 0.1) { // Lower threshold for guest mode
+          results.push({
+            id: chunk.id,
+            fileName: chunk.fileName || chunk.file_name,
+            title: chunk.fileName || chunk.file_name,
+            snippet: chunkText.substring(0, 200) + '...',
+            relevanceScore: relevanceScore,
+            fileType: 'document',
+            uploadedAt: chunk.createdAt || chunk.created_at,
+            matchedChunks: [chunkText.substring(0, 150) + '...']
+          })
+        }
+      }
+
+      // Sort by relevance and limit results
+      const sortedResults = results
+        .sort((a, b) => b.relevanceScore - a.relevanceScore)
+        .slice(0, 10)
+
+      console.log(`Guest mode search found ${sortedResults.length} results for query: "${query}"`)
+      
+      setResults(sortedResults)
+      setTotalResults(sortedResults.length)
+      setSearchTime("")
+    } catch (error) {
+      console.error("Guest mode search error:", error)
+      setResults([])
+      setTotalResults(0)
+      setSearchTime("")
     }
   }
 

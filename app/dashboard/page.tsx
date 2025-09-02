@@ -23,7 +23,10 @@ import {
   Eye,
   Trash2,
   RefreshCw,
+  AlertCircle,
 } from "lucide-react"
+import GuestModeIndicator from "@/components/guest-mode-indicator"
+import { LogoLoader } from "@/components/logo-loader"
 
 interface Document {
   id: string
@@ -49,6 +52,8 @@ export default function DashboardPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [stats, setStats] = useState({
     totalDocuments: 0,
     totalProcessed: 0,
@@ -236,6 +241,65 @@ export default function DashboardPage() {
     })
   }
 
+  const deleteDocument = async (docId: string) => {
+    setDeleting(true)
+    try {
+      // Clean up RAG data (document chunks and embeddings)
+      try {
+        const cleanupResponse = await fetch('/api/rag/cleanup', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId: docId
+          })
+        })
+        if (cleanupResponse.ok) {
+          console.log('RAG data cleaned up successfully')
+        } else {
+          console.warn('Failed to clean up RAG data:', await cleanupResponse.text())
+        }
+      } catch (ragError) {
+        console.warn('RAG cleanup failed (continuing with document removal):', ragError)
+      }
+
+      // Remove from database if it exists there
+      try {
+        const deleteResponse = await fetch(`/api/documents/${docId}`, {
+          method: 'DELETE'
+        })
+        if (deleteResponse.ok) {
+          console.log('Document removed from database successfully')
+        } else {
+          console.warn('Failed to remove document from database:', await deleteResponse.text())
+        }
+      } catch (dbError) {
+        console.warn('Database removal failed (continuing with file removal):', dbError)
+      }
+
+      // Remove from localStorage
+      try {
+        const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+        delete existing[docId]
+        localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+      } catch (localError) {
+        console.warn('localStorage cleanup failed:', localError)
+      }
+
+      // Remove from UI
+      setDocuments(prev => prev.filter(doc => doc.id !== docId))
+      setDeleteConfirmDoc(null)
+      
+      // Show success message
+      alert('Document deleted successfully')
+      
+    } catch (error) {
+      console.error("Error deleting document:", error)
+      alert('Failed to delete document')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -268,11 +332,18 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* Guest Mode Indicator */}
+      <div className="container mx-auto px-6 py-4">
+        <GuestModeIndicator />
+      </div>
+
+
+
       <div className="container mx-auto px-6 py-8 max-w-7xl">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-light text-foreground mb-2">Dashboard</h1>
-          <p className="text-muted-foreground font-light">
+          <p className="text-muted-foreground font-montserrat-light">
             Manage your documents and track your AI processing activity
           </p>
         </div>
@@ -357,8 +428,7 @@ export default function DashboardPage() {
             <div className="space-y-4">
               {loading && documents.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground font-light">Loading documents...</p>
+                  <LogoLoader size="md" text="Loading documents..." />
                 </div>
               ) : documents.length === 0 ? (
                 <div className="text-center py-8">
@@ -437,8 +507,14 @@ export default function DashboardPage() {
                                 Search
                               </Link>
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                              <Trash2 className="mr-2 h-4 w-4" />
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => setDeleteConfirmDoc(doc.id)}
+                              disabled={deleting}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
@@ -494,6 +570,43 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-background border-2 border-red-200 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">Delete Document?</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                This will permanently delete the document and all associated data including:
+                <br />• Document content and metadata
+                <br />• RAG embeddings and search chunks
+                <br />• Database records
+                <br />• Local storage data
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteConfirmDoc(null)}
+                  className="font-light"
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteDocument(deleteConfirmDoc)}
+                  className="font-light"
+                  disabled={deleting}
+                >
+                  {deleting ? "Deleting..." : "Delete Permanently"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 import { useRouter } from "next/navigation"
-import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -11,41 +10,27 @@ import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2, Eye } from "lucide-react"
-import GoogleDriveImport from '@/components/google-drive-import'
-import FileTypeInfo from '@/components/file-type-info'
+import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react"
+import { LogoLoader } from "@/components/logo-loader"
+
 
 interface UploadedFile {
   id: string
   file: File
-  status: "uploading" | "processing" | "completed" | "error"
+  status: "uploading" | "processing" | "completed" | "error" | "cancelled"
   progress: number
   error?: string
   warning?: string
   fileId?: string
   showTextractButton?: boolean
+  abortController?: AbortController
+  isCancellable?: boolean
 }
 
 const ACCEPTED_FILE_TYPES = {
-  // Google Workspace
-  "application/vnd.google-apps.document": [".gdoc"],
-  "application/vnd.google-apps.spreadsheet": [".gsheet"],
-  "application/vnd.google-apps.presentation": [".gslides"],
-  // Microsoft Office
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
-  // Legacy Office
-  "application/msword": [".doc"],
-  "application/vnd.ms-excel": [".xls"],
-  "application/vnd.ms-powerpoint": [".ppt"],
-  // Text formats
-  "text/plain": [".txt"],
+  "application/pdf": [".pdf"],
   "text/markdown": [".md"],
   "text/csv": [".csv"],
-  // PDF
-  "application/pdf": [".pdf"],
-  // Audio/Video
   "audio/wav": [".wav"],
   "video/mp4": [".mp4"],
 }
@@ -55,12 +40,10 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 export default function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [progressIntervals, setProgressIntervals] = useState<Map<string, NodeJS.Timeout>>(new Map())
-  const [documentViewerOpen, setDocumentViewerOpen] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedFileData, setSelectedFileData] = useState<any>(null)
-  const [saveToDatabase, setSaveToDatabase] = useState(false)
+
+  const [deleteConfirmFile, setDeleteConfirmFile] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const router = useRouter()
-  const [driveOpen, setDriveOpen] = useState(false)
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map((file) => ({
@@ -99,15 +82,6 @@ export default function UploadPage() {
       // Upload file
       const formData = new FormData()
       formData.append("file", uploadedFile.file)
-      formData.append("saveToDatabase", String(saveToDatabase))
-      // Include userId if signed in
-      try {
-        const supabase = getSupabaseBrowser()
-        if (supabase) {
-          const { data: { user } } = await supabase.auth.getUser()
-          if (user?.id) formData.append('userId', user.id)
-        }
-      } catch {}
 
       const uploadResponse = await fetch("/api/upload", {
         method: "POST",
@@ -325,128 +299,50 @@ export default function UploadPage() {
           return
         }
         
-                 // For images, we need to extract text first before AI processing
-         if (uploadedFile.file.type.includes('image')) {
-           setFiles((prev) => prev.map((f) => f.id === fileId ? { 
-             ...f, 
-             status: "completed", 
-             progress: 100,
-             warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
-             showTextractButton: true
-           } : f))
-           
-           toast("Image uploaded. Click 'Process with Textract' to extract text content.")
-           return
-         }
-         
-         // For CSV files, process directly with our file processor
-         if (uploadedFile.file.type.includes('csv') || uploadedFile.file.name.toLowerCase().includes('.csv')) {
-           // CSV files will be processed by our FileProcessor
-           // Continue to the processing section below
-         }
-         // For audio/video files, we need to extract text first before AI processing
-         else if (uploadedFile.file.type.includes('audio') || uploadedFile.file.type.includes('video')) {
-           setFiles((prev) => prev.map((f) => f.id === fileId ? { 
-             ...f, 
-             status: "completed", 
-             progress: 100,
-             warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
-             showTextractButton: true
-           } : f))
-           
-           toast("Audio/Video uploaded. Click 'Process with Textract' to extract text content.")
-           return
-         }
+        // For images, we need to extract text first before AI processing
+        if (uploadedFile.file.type.includes('image')) {
+          setFiles((prev) => prev.map((f) => f.id === fileId ? { 
+            ...f, 
+            status: "completed", 
+            progress: 100,
+            warning: "File uploaded successfully. Click 'Process with Textract' to extract text content.",
+            showTextractButton: true
+          } : f))
+          
+          toast("Image uploaded. Click 'Process with Textract' to extract text content.")
+          return
+        }
 
-             // Process file with our new file processor
-       const processFormData = new FormData()
-       processFormData.append('file', uploadedFile.file)
-       
-       const processResponse = await fetch("/api/process-file", {
-         method: "POST",
-         body: processFormData,
-       })
-       
-       if (!processResponse.ok) {
-         const errorData = await processResponse.json().catch(() => ({}))
-         const errorMessage = errorData.details || errorData.error || "Processing failed"
-         throw new Error(errorMessage)
-       }
-       
-       const processResult = await processResponse.json()
-       
-       // Update localStorage with processed content
-       try {
-         const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
-         if (existing[uploadResult.fileId]) {
-           existing[uploadResult.fileId] = {
-             ...existing[uploadResult.fileId],
-             extractedText: processResult.content,
-             wordCount: processResult.metadata.wordCount,
-             processed: true,
-             processingMethod: processResult.metadata.processingMethod,
-             processingTime: new Date().toISOString(),
-             metadata: {
-               ...existing[uploadResult.fileId].metadata,
-               processingMethod: processResult.metadata.processingMethod,
-               confidence: processResult.metadata.confidence,
-               note: `Text extracted using ${processResult.metadata.processingMethod}`
-             }
-           }
-           localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
-         }
-       } catch (error) {
-         console.warn('Failed to update localStorage:', error)
-       }
+      // Process file with AI with timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
+      const processResponse = await fetch("/api/process", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileId: uploadResult.fileId,
+          openaiKey,
+        }),
+        signal: controller.signal,
+      })
+      
+      clearTimeout(timeoutId)
 
-       // Save to database if available
-       try {
-         const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
-         const supabase = getSupabaseBrowser()
-         let userId = null
-         
-         if (supabase) {
-           const { data: { user } } = await supabase.auth.getUser()
-           userId = user?.id
-         }
+      if (!processResponse.ok) {
+        throw new Error("Processing failed")
+      }
 
-         const saveResponse = await fetch('/api/documents/save', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-             id: uploadResult.fileId,
-             name: uploadedFile.file.name,
-             type: uploadedFile.file.type,
-             size: uploadedFile.file.size,
-             extractedText: processResult.content,
-             summary: '', // Will be generated later
-             processingMethod: processResult.metadata.processingMethod,
-             userId: userId
-           })
-         })
-
-         if (saveResponse.ok) {
-           console.log('Document saved to database successfully')
-         } else {
-           console.warn('Failed to save document to database:', await saveResponse.text())
-         }
-       } catch (dbError) {
-         console.warn('Database save failed (continuing with localStorage):', dbError)
-       }
-
-             // Mark as completed
-       setFiles((prev) => prev.map((f) => (f.id === fileId ? { 
-         ...f, 
-         status: "completed", 
-         progress: 100,
-         warning: `Text extracted successfully using ${processResult.metadata.processingMethod} - ${processResult.metadata.wordCount} words`
-       } : f)))
-       
-       // Automatically redirect to results page after successful processing
-       toast.success(`Document processed successfully! Extracted ${processResult.metadata.wordCount} words using ${processResult.metadata.processingMethod}. Redirecting to results...`)
-       setTimeout(() => {
-         router.push(`/results/${uploadResult.fileId}`)
-       }, 1500)
+      // Mark as completed
+      setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "completed", progress: 100 } : f)))
+      
+      // Automatically redirect to results page after successful processing
+      toast.success("Document processed successfully! Redirecting to results...")
+      setTimeout(() => {
+        router.push(`/results/${uploadResult.fileId}`)
+      }, 1500)
     } catch (error) {
       console.error("File processing error:", error)
       let errorMessage = "Processing failed"
@@ -496,18 +392,122 @@ export default function UploadPage() {
     return interval
   }
 
-  const removeFile = (fileId: string) => {
-    // Clear progress interval if it exists
-    const interval = progressIntervals.get(fileId)
-    if (interval) {
-      clearInterval(interval)
-      setProgressIntervals(prev => {
-        const newMap = new Map(prev)
-        newMap.delete(fileId)
-        return newMap
-      })
+  const cancelProcessing = async (fileId: string) => {
+    const fileToCancel = files.find(f => f.id === fileId)
+    if (!fileToCancel) return
+
+    try {
+      // Abort any ongoing requests
+      if (fileToCancel.abortController) {
+        fileToCancel.abortController.abort()
+      }
+
+      // Clear progress interval
+      const interval = progressIntervals.get(fileId)
+      if (interval) {
+        clearInterval(interval)
+        setProgressIntervals(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(fileId)
+          return newMap
+        })
+      }
+
+      // Update file status to cancelled
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { ...f, status: "cancelled", progress: 0 } : f
+        )
+      )
+
+      toast("Processing cancelled successfully")
+    } catch (error) {
+      console.error("Error cancelling processing:", error)
+      toast.error("Failed to cancel processing")
     }
-    setFiles((prev) => prev.filter((file) => file.id !== fileId))
+  }
+
+  const removeFiles = async (fileIds: string[]) => {
+    try {
+      for (const fileId of fileIds) {
+        const fileToRemove = files.find(f => f.id === fileId)
+        if (!fileToRemove) continue
+
+        // Clear progress interval if it exists
+        const interval = progressIntervals.get(fileId)
+        if (interval) {
+          clearInterval(interval)
+          setProgressIntervals(prev => {
+            const newMap = new Map(prev)
+            newMap.delete(fileId)
+            return newMap
+          })
+        }
+
+        // If file has been processed and saved for RAG, clean it up
+        if (fileToRemove.fileId && fileToRemove.status === "completed") {
+          try {
+            // Clean up RAG data (document chunks and embeddings)
+            const cleanupResponse = await fetch('/api/rag/cleanup', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                documentId: fileToRemove.fileId
+              })
+            })
+
+            if (cleanupResponse.ok) {
+              console.log('RAG data cleaned up successfully')
+            } else {
+              console.warn('Failed to clean up RAG data:', await cleanupResponse.text())
+            }
+          } catch (ragError) {
+            console.warn('RAG cleanup failed (continuing with file removal):', ragError)
+          }
+
+          // Remove from database if it exists there
+          try {
+            const deleteResponse = await fetch(`/api/documents/${fileToRemove.fileId}`, {
+              method: 'DELETE'
+            })
+            
+            if (deleteResponse.ok) {
+              console.log('Document removed from database successfully')
+            } else {
+              console.warn('Failed to remove document from database:', await deleteResponse.text())
+            }
+          } catch (dbError) {
+            console.warn('Database removal failed (continuing with file removal):', dbError)
+          }
+        }
+
+        // Remove from localStorage
+        try {
+          if (fileToRemove.fileId) {
+            const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+            delete existing[fileToRemove.fileId]
+            localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+          }
+        } catch (localError) {
+          console.warn('localStorage cleanup failed:', localError)
+        }
+      }
+
+      // Remove from UI
+      setFiles((prev) => prev.filter((file) => !fileIds.includes(file.id)))
+      
+      // Clear selection
+      setSelectedFiles(new Set())
+      
+      toast.success(`${fileIds.length} file${fileIds.length > 1 ? 's' : ''} removed successfully`)
+    } catch (error) {
+      console.error("Error removing files:", error)
+      toast.error("Failed to remove files")
+    }
+  }
+
+    const removeFile = async (fileId: string) => {
+    await removeFiles([fileId])
   }
 
   const retryFile = (fileId: string) => {
@@ -808,47 +808,12 @@ export default function UploadPage() {
     }
   }
 
-  const openDocumentViewer = (uploadedFile: UploadedFile) => {
-    setSelectedFile(uploadedFile.file)
-    setSelectedFileData({
-      type: uploadedFile.file.type,
-      processed: uploadedFile.status === "completed",
-      processingMethod: uploadedFile.showTextractButton ? "pending" : "upload"
-    })
-    setDocumentViewerOpen(true)
-  }
+
 
   const getFileIcon = (file: File) => {
-    const fileName = file.name.toLowerCase()
-    const fileType = file.type.toLowerCase()
-    
-    // Google Workspace
-    if (fileName.includes('.gdoc')) return <FileText className="h-6 w-6 text-blue-600 drop-shadow-sm" />
-    if (fileName.includes('.gsheet')) return <FileText className="h-6 w-6 text-green-600 drop-shadow-sm" />
-    if (fileName.includes('.gslides')) return <FileText className="h-6 w-6 text-orange-600 drop-shadow-sm" />
-    
-    // Microsoft Office
-    if (fileName.includes('.docx') || fileType.includes('wordprocessingml')) return <FileText className="h-6 w-6 text-blue-700 drop-shadow-sm" />
-    if (fileName.includes('.xlsx') || fileType.includes('spreadsheetml')) return <FileText className="h-6 w-6 text-green-700 drop-shadow-sm" />
-    if (fileName.includes('.pptx') || fileType.includes('presentationml')) return <FileText className="h-6 w-6 text-orange-700 drop-shadow-sm" />
-    
-    // Legacy Office
-    if (fileName.includes('.doc') || fileType.includes('msword')) return <FileText className="h-6 w-6 text-blue-500 drop-shadow-sm" />
-    if (fileName.includes('.xls') || fileType.includes('ms-excel')) return <FileText className="h-6 w-6 text-green-500 drop-shadow-sm" />
-    if (fileName.includes('.ppt') || fileType.includes('ms-powerpoint')) return <FileText className="h-6 w-6 text-orange-500 drop-shadow-sm" />
-    
-    // Text formats
-    if (fileName.includes('.txt') || fileType.includes('text/')) return <FileText className="h-6 w-6 text-gray-600 drop-shadow-sm" />
-    if (fileName.includes('.md') || fileType.includes('markdown')) return <FileText className="h-6 w-6 text-purple-600 drop-shadow-sm" />
-    if (fileName.includes('.csv') || fileType.includes('csv')) return <FileText className="h-6 w-6 text-green-600 drop-shadow-sm" />
-    
-    // PDF
-    if (fileName.includes('.pdf') || fileType.includes('pdf')) return <FileText className="h-6 w-6 text-red-500 drop-shadow-sm" />
-    
-    // Audio/Video
-    if (fileType.includes("audio")) return <Music className="h-6 w-6 text-blue-500 drop-shadow-sm" />
-    if (fileType.includes("video")) return <Video className="h-6 w-6 text-purple-500 drop-shadow-sm" />
-    
+    if (file.type.includes("pdf")) return <FileText className="h-6 w-6 text-red-500 drop-shadow-sm" />
+    if (file.type.includes("audio")) return <Music className="h-6 w-6 text-blue-500 drop-shadow-sm" />
+    if (file.type.includes("video")) return <Video className="h-6 w-6 text-purple-500 drop-shadow-sm" />
     return <File className="h-6 w-6 text-primary drop-shadow-sm" />
   }
 
@@ -912,11 +877,11 @@ export default function UploadPage() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-light text-foreground mb-4 text-balance">Upload Your Documents</h1>
           <p className="text-lg text-muted-foreground font-light text-pretty">
-            Drag and drop your files or click to browse. We support Google Workspace, Microsoft Office, PDF, Markdown, CSV, audio, and video files.
+            Drag and drop your files or click to browse. We support PDF, Markdown, CSV, audio, and video files.
           </p>
         </div>
 
-                {/* Upload Zone */}
+        {/* Upload Zone */}
         <Card className="mb-8">
           <div
             {...getRootProps()}
@@ -935,36 +900,64 @@ export default function UploadPage() {
                     Drag and drop your files here, or click to browse
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Supports Google Workspace, Microsoft Office, PDF, Markdown, CSV, WAV, MP4 • Max 50MB per file
+                    Supports PDF, Markdown, CSV, WAV, MP4 • Max 50MB per file
                   </p>
-                  <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-                    <input
-                      id="save-db"
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={saveToDatabase}
-                      onChange={(e) => setSaveToDatabase(e.target.checked)}
-                    />
-                    <label htmlFor="save-db" className="text-muted-foreground">Save to database for semantic search</label>
-                  </div>
                 </>
               )}
             </div>
           </div>
-          <div className="p-4 flex justify-center">
-            <Button variant="outline" className="font-light" onClick={() => setDriveOpen(true)}>Import from Google Drive</Button>
-          </div>
         </Card>
 
-        {/* File Type Information */}
-        <div className="mb-8">
-          <FileTypeInfo />
-        </div>
-
-        {/* File List */}
-        {files.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-light text-foreground mb-4">Processing Files ({files.length})</h2>
+                 {/* File List */}
+         {files.length > 0 && (
+           <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                 <div className="flex items-center gap-4">
+                   <h2 className="text-2xl font-light text-foreground">Processing Files ({files.length})</h2>
+                   
+                   {/* Select All Checkbox */}
+                   {files.length > 0 && (
+                     <div className="flex items-center gap-2">
+                       <input
+                         type="checkbox"
+                         checked={selectedFiles.size === files.length && files.length > 0}
+                         onChange={(e) => {
+                           if (e.target.checked) {
+                             setSelectedFiles(new Set(files.map(f => f.id)))
+                           } else {
+                             setSelectedFiles(new Set())
+                           }
+                         }}
+                         className="h-4 w-4 text-primary border-primary/30 rounded focus:ring-primary/50"
+                       />
+                       <span className="text-sm text-muted-foreground">
+                         Select All
+                       </span>
+                     </div>
+                   )}
+                 </div>
+                 
+                 {/* Bulk Actions */}
+                 {selectedFiles.size > 0 && (
+                   <div className="flex items-center gap-3">
+                     <span className="text-sm text-muted-foreground">
+                       {selectedFiles.size} file{selectedFiles.size > 1 ? 's' : ''} selected
+                     </span>
+                     <Button
+                       variant="destructive"
+                       size="sm"
+                       onClick={() => {
+                         const selectedArray = Array.from(selectedFiles)
+                         setDeleteConfirmFile('bulk')
+                         setSelectedFiles(new Set(selectedArray))
+                       }}
+                       className="font-light"
+                     >
+                       Delete Selected ({selectedFiles.size})
+                     </Button>
+                   </div>
+                 )}
+               </div>
             
             {/* API Key Status */}
             {!localStorage.getItem("voiceloop_openai_key") && (
@@ -987,9 +980,27 @@ export default function UploadPage() {
             )}
 
             {files.map((uploadedFile) => (
-                             <Card key={uploadedFile.id} className="p-6 border-2 border-primary/20 hover:border-primary/30 transition-colors duration-200 shadow-sm hover:shadow-md">
-                <div className="flex items-center gap-4">
-                  <div className="text-muted-foreground">{getFileIcon(uploadedFile.file)}</div>
+                                            <Card key={uploadedFile.id} className="p-6 border-2 border-primary/20 hover:border-primary/30 transition-colors duration-200 shadow-sm hover:shadow-md">
+                 <div className="flex items-center gap-4">
+                   {/* Selection Checkbox */}
+                   <input
+                     type="checkbox"
+                     checked={selectedFiles.has(uploadedFile.id)}
+                     onChange={(e) => {
+                       if (e.target.checked) {
+                         setSelectedFiles(prev => new Set([...prev, uploadedFile.id]))
+                       } else {
+                         setSelectedFiles(prev => {
+                           const newSet = new Set(prev)
+                           newSet.delete(uploadedFile.id)
+                           return newSet
+                         })
+                       }
+                     }}
+                     className="h-4 w-4 text-primary border-primary/30 rounded focus:ring-primary/50"
+                   />
+                   
+                   <div className="text-muted-foreground">{getFileIcon(uploadedFile.file)}</div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
@@ -1007,20 +1018,25 @@ export default function UploadPage() {
                     <div className="flex items-center gap-3">
                       <Progress value={uploadedFile.progress} className="flex-1 h-2" />
                       <div className="flex items-center gap-2 min-w-0">
-                        {uploadedFile.status === "uploading" && (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                            <span className="text-sm text-muted-foreground">Uploading...</span>
-                          </>
-                        )}
-                        {uploadedFile.status === "processing" && (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
-                            <span className="text-sm text-muted-foreground">
-                              {uploadedFile.fileId ? "Processing with AI..." : "Uploading..."}
-                            </span>
-                          </>
-                        )}
+                                                 {uploadedFile.status === "uploading" && (
+                           <>
+                             <LogoLoader size="sm" text="Uploading..." />
+                           </>
+                         )}
+                         {uploadedFile.status === "processing" && (
+                           <>
+                             <LogoLoader size="sm" text={uploadedFile.fileId ? "Processing with AI..." : "Uploading..."} />
+                             {/* Cancel Button for Processing */}
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               className="ml-2 font-light bg-transparent border-2 border-red-300 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700 transition-all duration-200"
+                               onClick={() => cancelProcessing(uploadedFile.id)}
+                             >
+                               Cancel
+                             </Button>
+                           </>
+                         )}
                         {uploadedFile.status === "completed" && (
                           <>
                             <CheckCircle className="h-4 w-4 text-green-500" />
@@ -1030,17 +1046,14 @@ export default function UploadPage() {
                             )}
                           </>
                         )}
+                        {uploadedFile.status === "cancelled" && (
+                          <>
+                            <AlertCircle className="h-4 w-4 text-orange-500" />
+                            <span className="text-sm text-orange-600">Cancelled</span>
+                          </>
+                        )}
                         
-                        {/* Document Viewer Button - Available for all file states */}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="ml-2 font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md"
-                          onClick={() => openDocumentViewer(uploadedFile)}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Document
-                        </Button>
+
                         
                                                  {/* Processing Options - Only for completed files that need processing */}
                          {uploadedFile.status === "completed" && uploadedFile.showTextractButton && (
@@ -1093,14 +1106,18 @@ export default function UploadPage() {
                     </div>
                   </div>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeFile(uploadedFile.id)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                                     <div className="flex items-center gap-2">
+                     {/* Delete Button */}
+                     <Button
+                       variant="ghost"
+                       size="sm"
+                       onClick={() => setDeleteConfirmFile(uploadedFile.id)}
+                       className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                       title="Delete file and all associated data"
+                     >
+                       <X className="h-4 w-4" />
+                     </Button>
+                   </div>
                 </div>
               </Card>
             ))}
@@ -1108,63 +1125,55 @@ export default function UploadPage() {
                  )}
        </div>
 
-       {/* File Preview Modal */}
-       {documentViewerOpen && selectedFile && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-           <div className="bg-background border-2 border-primary/20 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-             <div className="flex items-center justify-between mb-4">
-               <h2 className="text-xl font-light text-foreground">File Preview</h2>
-               <Button
-                 variant="ghost"
-                 size="sm"
-                 onClick={() => setDocumentViewerOpen(false)}
-                 className="text-muted-foreground hover:text-foreground"
-               >
-                 <X className="h-4 w-4" />
-               </Button>
-             </div>
-             
-             <div className="space-y-4">
-               <div className="flex items-center gap-3">
-                 {getFileIcon(selectedFile)}
-                 <div>
-                   <h3 className="font-medium text-foreground">{selectedFile.name}</h3>
-                   <p className="text-sm text-muted-foreground">
-                     {selectedFile.type} • {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                   </p>
-                 </div>
-               </div>
-               
-               {selectedFileData?.processed && (
-                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                   <p className="text-sm text-green-800">
-                     ✅ File processed successfully
-                   </p>
-                 </div>
-               )}
-               
-               <div className="text-sm text-muted-foreground">
-                 <p>File uploaded and ready for processing.</p>
-                 <p>Use the processing options below to extract text and generate insights.</p>
-               </div>
-             </div>
-           </div>
-         </div>
-       )}
-       <GoogleDriveImport
-         open={driveOpen}
-         onClose={() => setDriveOpen(false)}
-         onPicked={(file) => {
-           const id = Math.random().toString(36).slice(2)
-           const uploadedFile = { id, file, status: 'uploading' as const, progress: 0 }
-           setFiles(prev => ([...prev, uploadedFile]))
-           const progressInterval = simulateProgress(id)
-           if (progressInterval) {
-             setProgressIntervals(prev => new Map(prev).set(id, progressInterval))
-           }
-           setTimeout(() => processFile(id, uploadedFile as any), 500)
-         }}
-       />
+               {/* Delete Confirmation Modal */}
+        {deleteConfirmFile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="bg-background border-2 border-red-200 rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="text-center">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  {deleteConfirmFile === 'bulk' ? 'Delete Selected Files?' : 'Delete File?'}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  This will permanently delete {deleteConfirmFile === 'bulk' ? 'the selected files' : 'the file'} and all associated data including:
+                  <br />• Document content and metadata
+                  <br />• RAG embeddings and search chunks
+                  <br />• Database records
+                  <br />• Local storage data
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDeleteConfirmFile(null)
+                      setSelectedFiles(new Set())
+                    }}
+                    className="font-light"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={async () => {
+                      if (deleteConfirmFile === 'bulk') {
+                        await removeFiles(Array.from(selectedFiles))
+                      } else {
+                        await removeFile(deleteConfirmFile)
+                      }
+                      setDeleteConfirmFile(null)
+                      setSelectedFiles(new Set())
+                    }}
+                    className="font-light"
+                  >
+                    {deleteConfirmFile === 'bulk' ? `Delete ${selectedFiles.size} Files` : 'Delete Permanently'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
      </div>
    )
  }
