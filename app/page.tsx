@@ -1,10 +1,53 @@
+"use client"
+
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { Upload, Mic, Search, Zap, FileText, Volume2, LayoutDashboard } from "lucide-react"
+import { useEffect, useState } from 'react'
+import { AuthModal } from '@/components/auth-modal'
 
 export default function HomePage() {
+  const [userId, setUserId] = useState<string | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const supabase = getSupabaseBrowser()
+        if (!supabase) return
+        const { data: { user } } = await supabase.auth.getUser()
+        setUserId(user?.id ?? null)
+      } catch {}
+    }
+    loadUser()
+  }, [])
+
+  const handleOAuth = async (provider: 'google' | 'linkedin_oidc') => {
+    try {
+      const supabase = getSupabaseBrowser()
+      if (!supabase) return
+      const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined
+      await supabase.auth.signInWithOAuth({ provider, options: { redirectTo, queryParams: { prompt: 'select_account' } } })
+    } catch (e) {
+      console.error('Auth error:', e)
+    }
+  }
+
+  const handleEmailMagic = async () => {
+    const email = prompt('Enter your email for a magic link')
+    if (!email) return
+    try {
+      const supabase = getSupabaseBrowser()
+      if (!supabase) return
+      await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined } })
+      alert('Check your email for the sign-in link.')
+    } catch (e) {
+      console.error('Email sign-in error:', e)
+    }
+  }
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -25,6 +68,31 @@ export default function HomePage() {
               <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
                 <Link href="/settings">Settings</Link>
               </Button>
+              {userId ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-light bg-transparent"
+                  onClick={async () => {
+                    try {
+                      const supabase = getSupabaseBrowser()
+                      await supabase?.auth.signOut()
+                      setUserId(null)
+                    } catch {}
+                  }}
+                >
+                  Sign out
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-light bg-transparent"
+                  onClick={() => setAuthOpen(true)}
+                >
+                  Sign in
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -67,6 +135,8 @@ export default function HomePage() {
               </Link>
             </Button>
           </div>
+
+          {/* Auth CTA removed in favor of single nav button */}
         </div>
       </section>
 
@@ -156,6 +226,8 @@ export default function HomePage() {
           </p>
         </div>
       </footer>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   )
 }

@@ -55,90 +55,53 @@ export default function DashboardPage() {
   })
 
   useEffect(() => {
-    // Load mock data
-    const mockDocuments: Document[] = [
-      {
-        id: "doc_1",
-        name: "Project_Proposal.pdf",
-        type: "application/pdf",
-        size: 2048576,
-        status: "completed",
-        uploadedAt: "2025-01-15T10:30:00Z",
-        lastAccessed: "2025-01-15T14:20:00Z",
-        summary: "Strategic initiative proposal for Q4 with budget allocations and timelines",
-        processingTime: "2.3s",
-      },
-      {
-        id: "doc_2",
-        name: "Meeting_Notes.md",
-        type: "text/markdown",
-        size: 45678,
-        status: "completed",
-        uploadedAt: "2025-01-14T14:20:00Z",
-        lastAccessed: "2025-01-15T09:15:00Z",
-        summary: "Weekly team meeting notes with project updates and decisions",
-        processingTime: "1.1s",
-      },
-      {
-        id: "doc_3",
-        name: "Budget_Analysis.csv",
-        type: "text/csv",
-        size: 123456,
-        status: "processing",
-        uploadedAt: "2025-01-15T16:45:00Z",
-        processingTime: "Processing...",
-      },
-      {
-        id: "doc_4",
-        name: "Team_Call_Recording.wav",
-        type: "audio/wav",
-        size: 15728640,
-        status: "completed",
-        uploadedAt: "2025-01-13T11:00:00Z",
-        lastAccessed: "2025-01-14T16:30:00Z",
-        summary: "Team call discussion about project milestones and resource allocation",
-        processingTime: "4.7s",
-      },
-    ]
+    const load = async () => {
+      try {
+        // Include user filter if signed in (server reads userId query param)
+        let userIdParam = ''
+        try {
+          const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
+          const supabase = getSupabaseBrowser()
+          if (supabase) {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user?.id) userIdParam = `?userId=${encodeURIComponent(user.id)}`
+          }
+        } catch {}
 
-    const mockActivity: ActivityItem[] = [
-      {
-        id: "act_1",
-        type: "upload",
-        description: "Uploaded Budget_Analysis.csv",
-        timestamp: "2025-01-15T16:45:00Z",
-        documentName: "Budget_Analysis.csv",
-      },
-      {
-        id: "act_2",
-        type: "search",
-        description: 'Searched for "budget allocation"',
-        timestamp: "2025-01-15T14:30:00Z",
-      },
-      {
-        id: "act_3",
-        type: "chat",
-        description: "Started voice chat about Project_Proposal.pdf",
-        timestamp: "2025-01-15T14:20:00Z",
-        documentName: "Project_Proposal.pdf",
-      },
-      {
-        id: "act_4",
-        type: "process",
-        description: "Completed processing Meeting_Notes.md",
-        timestamp: "2025-01-14T14:25:00Z",
-        documentName: "Meeting_Notes.md",
-      },
-    ]
-
-    setDocuments(mockDocuments)
-    setRecentActivity(mockActivity)
-    setStats({
-      totalDocuments: mockDocuments.length,
-      totalProcessed: mockDocuments.filter((d) => d.status === "completed").length,
-      totalSearches: 12,
-      totalChats: 8,
-    })
+        const res = await fetch(`/api/documents${userIdParam}`)
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && Array.isArray(data.documents)) {
+          const mapped: Document[] = data.documents.map((d: any) => ({
+            id: d.id,
+            name: d.file_name || 'Document',
+            type: d.mime_type || 'text/plain',
+            size: d.file_size || (d.content ? d.content.length : 0),
+            status: 'completed',
+            uploadedAt: d.uploaded_at,
+            lastAccessed: undefined,
+            summary: undefined,
+            processingTime: undefined,
+          }))
+          setDocuments(mapped)
+          setStats({
+            totalDocuments: mapped.length,
+            totalProcessed: mapped.length,
+            totalSearches: 0,
+            totalChats: 0,
+          })
+          setRecentActivity([])
+        } else {
+          setDocuments([])
+          setRecentActivity([])
+          setStats({ totalDocuments: 0, totalProcessed: 0, totalSearches: 0, totalChats: 0 })
+        }
+      } catch {
+        setDocuments([])
+        setRecentActivity([])
+        setStats({ totalDocuments: 0, totalProcessed: 0, totalSearches: 0, totalChats: 0 })
+      }
+    }
+    load()
   }, [])
 
   const getFileIcon = (type: string) => {

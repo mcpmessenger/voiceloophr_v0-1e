@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -44,30 +45,38 @@ export default function SearchInterface() {
     setHasSearched(true)
 
     try {
-      const openaiKey = localStorage.getItem("voiceloop_openai_key")
-      if (!openaiKey) {
-        throw new Error("OpenAI API key not configured. Please add it in Settings.")
-      }
+      // No client key required for semantic search; server uses its own key
 
-      const response = await fetch("/api/search", {
+      // Include userId if signed in
+      let userId: string | undefined
+      try {
+        const supabase = getSupabaseBrowser()
+        if (supabase) {
+          const { data: { user } } = await supabase.auth.getUser()
+          userId = user?.id
+        }
+      } catch {}
+
+      const response = await fetch("/api/search/semantic", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          query,
-          openaiKey,
-        }),
+        body: JSON.stringify({ query, userId }),
       })
 
       if (!response.ok) {
-        throw new Error("Search failed")
+        const text = await response.text().catch(() => '')
+        let err: any = {}
+        try { err = JSON.parse(text) } catch {}
+        console.error('Search failed:', err || text)
+        throw new Error(err?.error || text || "Search failed")
       }
 
-      const data: SearchResponse = await response.json()
-      setResults(data.results)
-      setTotalResults(data.totalResults)
-      setSearchTime(data.searchTime)
+      const data = await response.json()
+      setResults(data.results || [])
+      setTotalResults(data.totalResults || (data.results?.length ?? 0))
+      setSearchTime("")
     } catch (error) {
       console.error("Search error:", error)
       setResults([])

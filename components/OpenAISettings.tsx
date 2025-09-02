@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Settings, Key, Check, Eye, EyeOff } from 'lucide-react'
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
 
 export default function OpenAISettings() {
   const [apiKey, setApiKey] = useState('')
@@ -34,9 +35,20 @@ export default function OpenAISettings() {
         return
       }
 
-      // Save to localStorage
+      // Save locally for fallback
       localStorage.setItem('openai_api_key', apiKey)
       setIsValid(true)
+
+      // If signed in, persist to server
+      const supabase = getSupabaseBrowser()
+      const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } as any }
+      if (user?.id) {
+        await fetch('/api/user/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, openaiApiKey: apiKey })
+        })
+      }
       
       // Test the key with a simple API call
       const response = await fetch('/api/analyze', {

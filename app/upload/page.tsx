@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 import { useRouter } from "next/navigation"
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft, Loader2, Eye } from "lucide-react"
 import DocumentViewer from "@/components/DocumentViewer"
+import GoogleDriveImport from '@/components/google-drive-import'
 
 interface UploadedFile {
   id: string
@@ -40,7 +42,9 @@ export default function UploadPage() {
   const [documentViewerOpen, setDocumentViewerOpen] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedFileData, setSelectedFileData] = useState<any>(null)
+  const [saveToDatabase, setSaveToDatabase] = useState(false)
   const router = useRouter()
+  const [driveOpen, setDriveOpen] = useState(false)
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map((file) => ({
@@ -79,6 +83,15 @@ export default function UploadPage() {
       // Upload file
       const formData = new FormData()
       formData.append("file", uploadedFile.file)
+      formData.append("saveToDatabase", String(saveToDatabase))
+      // Include userId if signed in
+      try {
+        const supabase = getSupabaseBrowser()
+        if (supabase) {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user?.id) formData.append('userId', user.id)
+        }
+      } catch {}
 
       const uploadResponse = await fetch("/api/upload", {
         method: "POST",
@@ -803,9 +816,22 @@ export default function UploadPage() {
                   <p className="text-sm text-muted-foreground">
                     Supports PDF, Markdown, CSV, WAV, MP4 • Max 50MB per file
                   </p>
+                  <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+                    <input
+                      id="save-db"
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={saveToDatabase}
+                      onChange={(e) => setSaveToDatabase(e.target.checked)}
+                    />
+                    <label htmlFor="save-db" className="text-muted-foreground">Save to database for semantic search</label>
+                  </div>
                 </>
               )}
             </div>
+          </div>
+          <div className="p-4 flex justify-center">
+            <Button variant="outline" className="font-light" onClick={() => setDriveOpen(true)}>Import from Google Drive</Button>
           </div>
         </Card>
 
@@ -962,6 +988,20 @@ export default function UploadPage() {
          fileData={selectedFileData}
          isOpen={documentViewerOpen}
          onClose={() => setDocumentViewerOpen(false)}
+       />
+       <GoogleDriveImport
+         open={driveOpen}
+         onClose={() => setDriveOpen(false)}
+         onPicked={(file) => {
+           const id = Math.random().toString(36).slice(2)
+           const uploadedFile = { id, file, status: 'uploading' as const, progress: 0 }
+           setFiles(prev => ([...prev, uploadedFile]))
+           const progressInterval = simulateProgress(id)
+           if (progressInterval) {
+             setProgressIntervals(prev => new Map(prev).set(id, progressInterval))
+           }
+           setTimeout(() => processFile(id, uploadedFile as any), 500)
+         }}
        />
      </div>
    )

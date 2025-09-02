@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get("file") as File
+    const saveToDatabase = (formData.get("saveToDatabase") as string) === "true"
+    const userId = (formData.get("userId") as string) || undefined
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
@@ -153,8 +155,30 @@ export async function POST(request: NextRequest) {
     console.log(`✅ File stored in global memory: ${fileId} (${file.name})`)
     console.log(`📊 Total files in global storage: ${global.uploadedFiles.size}`)
     
+    // Optionally save to database with embeddings
+    let saved = false
+    let documentId: string | null = null
+    if (saveToDatabase && extractedText) {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/documents/store`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: extractedText, fileName: file.name, userId })
+        })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data?.success) {
+          saved = true
+          documentId = data.documentId || null
+        } else {
+          console.warn('Save to database failed:', data)
+        }
+      } catch (e) {
+        console.warn('Save to database error:', e)
+      }
+    }
+
     // Note: localStorage will be handled client-side after successful upload
-    
+
     // Return success response
     return NextResponse.json({
       success: true,
@@ -164,6 +188,8 @@ export async function POST(request: NextRequest) {
       fileSize: file.size,
       wordCount: wordCount,
       extractedText: extractedText ? extractedText.substring(0, 200) + (extractedText.length > 200 ? "..." : "") : "",
+      saved,
+      documentId,
       message: processingMethod === "direct" ? "File uploaded and text extracted successfully" : 
                processingMethod === "textract" ? "File uploaded successfully. Text extraction requires AWS Textract processing." :
                "File uploaded successfully and ready for processing"

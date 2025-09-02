@@ -25,6 +25,11 @@ export const metadata: Metadata = {
   description:
     "Transform your documents into searchable, conversational knowledge with AI-powered summaries and voice capabilities.",
   generator: "v0.app",
+  icons: {
+    icon: "/images/voiceloop-logo.png",
+    shortcut: "/images/voiceloop-logo.png",
+    apple: "/images/voiceloop-logo.png",
+  },
 }
 
 export default function RootLayout({
