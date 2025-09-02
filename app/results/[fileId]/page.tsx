@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, FileText, Mic, Copy, Check, AlertCircle } from "lucide-react"
 import { LocalStorageManager } from "@/lib/utils/storage"
 import OpenAISettings from "@/components/OpenAISettings"
-import VoiceChat from "@/components/VoiceChat"
+import UnifiedVoiceChat from "@/components/voice-chat"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import SaveForSearchButton from "@/components/save-for-search-button"
 import SaveToDatabaseButton from "@/components/save-to-database-button"
@@ -34,7 +34,7 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [isBrowser, setIsBrowser] = useState(false)
-  const [isVoiceChatOpen, setIsVoiceChatOpen] = useState(false)
+  // Inline chat (unified component); no modal state needed
   const [error, setError] = useState<string | null>(null)
 
   // Ensure we're in the browser environment
@@ -351,7 +351,12 @@ export default function ResultsPage() {
               // Navigate to dashboard
               window.location.href = '/dashboard'
             }}
-            onStartVoiceChat={() => setIsVoiceChatOpen(true)}
+            onStartVoiceChat={() => {
+              const el = document.getElementById('inline-voice-chat')
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            }}
           />
 
           {/* Save Options */}
@@ -384,8 +389,8 @@ export default function ResultsPage() {
             />
           </div>
 
-          {/* OpenAI Settings - Only show if user opens voice chat and no key configured */}
-          {typeof window !== 'undefined' && isVoiceChatOpen && !localStorage.getItem('voiceloop_openai_key') && (
+          {/* OpenAI Settings helper */}
+          {typeof window !== 'undefined' && !localStorage.getItem('voiceloop_openai_key') && (
             <div className="mt-8">
               <OpenAISettings />
             </div>
@@ -397,14 +402,13 @@ export default function ResultsPage() {
         </div>
       </section>
 
-      {/* Voice Chat Modal */}
+      {/* Inline Unified Voice Chat */}
       {fileData && (
-        <VoiceChat
-          documentText={fileData.extractedText}
-          documentName={fileData.name}
-          isOpen={isVoiceChatOpen}
-          onClose={() => setIsVoiceChatOpen(false)}
-        />
+        <div id="inline-voice-chat" className="container mx-auto px-6 pb-12">
+          <div className="max-w-4xl mx-auto">
+            <UnifiedVoiceChat documentText={fileData.extractedText} documentName={fileData.name} />
+          </div>
+        </div>
       )}
     </div>
   )

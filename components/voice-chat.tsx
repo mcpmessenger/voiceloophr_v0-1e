@@ -20,14 +20,17 @@ interface Message {
 interface VoiceChatProps {
   fileId?: string
   fileName?: string
+  documentText?: string
+  documentName?: string
 }
 
-export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
+export default function VoiceChat({ fileId, fileName, documentText, documentName }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [autoSpeak, setAutoSpeak] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [audioChunks, setAudioChunks] = useState<Blob[]>([])
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
@@ -45,14 +48,21 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
       const welcomeMessage: Message = {
         id: "welcome",
         type: "assistant",
-        content: fileId
-          ? `Hello! I'm ready to discuss "${fileName}" with you. You can ask me questions about the document using text or voice.`
+        content: (documentName || fileName)
+          ? `Hello! I'm ready to discuss "${documentName || fileName}" with you. You can ask me questions about the document using text or voice.`
           : "Hello! I'm your AI assistant. How can I help you today?",
         timestamp: new Date(),
       }
       setMessages([welcomeMessage])
     }
-  }, [fileId, fileName, messages.length])
+  }, [fileId, fileName, documentName, messages.length])
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('voiceloop_auto_speak')
+      if (saved) setAutoSpeak(saved === 'true')
+    } catch {}
+  }, [])
 
   const startRecording = async () => {
     try {
@@ -171,6 +181,33 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
       }
 
       // Get AI response
+      // Try to include local document context from ALL local files if available and no fileId
+      let contextText: string | undefined
+      if (!fileId) {
+        try {
+          const existingRaw = localStorage.getItem('voiceloop_uploaded_files') || '{}'
+          const existing: Record<string, any> = JSON.parse(existingRaw)
+          const all: any[] = Object.values(existing)
+          if (Array.isArray(all) && all.length > 0) {
+            // Concatenate up to N documents' contents, newest first
+            const sorted = all.sort((a: any, b: any) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime())
+            const MAX_TOTAL = 12000
+            let acc = ''
+            for (const doc of sorted) {
+              if (typeof doc.extractedText === 'string' && doc.extractedText.length > 0) {
+                const header = `\n\n[Document: ${doc.name || 'Untitled'}]\n`
+                const remaining = MAX_TOTAL - acc.length
+                if (remaining <= 0) break
+                const slice = String(doc.extractedText).slice(0, Math.max(0, remaining - header.length))
+                acc += header + slice
+              }
+              if (acc.length >= MAX_TOTAL) break
+            }
+            if (acc.length > 0) contextText = acc
+          }
+        } catch {}
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -180,11 +217,26 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
           message,
           fileId,
           openaiKey,
+          contextText: documentText && documentText.length > 0 ? String(documentText).slice(0, 12000) : contextText,
         }),
       })
 
       if (!response.ok) {
-        throw new Error("Chat failed")
+        // Try to surface detailed server error with details/suggestion
+        let serverError = "Chat failed"
+        try {
+          const data = await response.json()
+          const err = data?.error || serverError
+          const details = data?.details ? ` Details: ${data.details}` : ""
+          const suggestion = data?.suggestion ? ` Suggestion: ${data.suggestion}` : ""
+          serverError = `${err}.${details}${suggestion}`.trim()
+        } catch {
+          try {
+            const text = await response.text()
+            if (text) serverError = `${serverError} (${text})`
+          } catch {}
+        }
+        throw new Error(serverError)
       }
 
       const result = await response.json()
@@ -198,8 +250,8 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
 
       setMessages((prev) => [...prev, assistantMessage])
 
-      // Convert response to speech if voice was used
-      if (isVoiceResponse) {
+      // Convert response to speech if voice was used or autoSpeak is enabled
+      if (isVoiceResponse || autoSpeak) {
         await speakResponse(result.response)
       }
     } catch (error) {
@@ -207,7 +259,9 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
-        content: "Sorry, I encountered an error. Please check your API keys in Settings.",
+        content: error instanceof Error 
+          ? `Chat Error: ${error.message}` 
+          : "Sorry, I encountered an unexpected error. Please try again.",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
@@ -216,73 +270,112 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
 
   const speakResponse = async (text: string) => {
     try {
+      // Determine TTS provider preference
+      const provider = (localStorage.getItem('voiceloop_tts_provider') as 'auto' | 'elevenlabs' | 'openai' | null) || 'auto'
       const elevenlabsKey = localStorage.getItem("voiceloop_elevenlabs_key")
-      if (!elevenlabsKey) {
-        console.log("ElevenLabs key not configured, skipping TTS")
-        return
-      }
+      const elevenlabsVoice = localStorage.getItem('voiceloop_elevenlabs_voice') || ''
 
       setIsSpeaking(true)
 
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text,
-          elevenlabsKey,
-        }),
-      })
+      // Helper to play blob
+      const playBlob = async (blob: Blob) => {
+        const audioUrl = URL.createObjectURL(blob)
+        const audio = new Audio(audioUrl)
+        audio.preload = "auto"
+        audio.muted = false
+        audio.volume = 1
+        setCurrentAudio(audio)
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "TTS failed")
-      }
-
-      // Handle audio streaming response
-      const audioBlob = await response.blob()
-      console.log("TTS blob size(bytes):", audioBlob.size)
-      const audioUrl = URL.createObjectURL(audioBlob)
-      
-      // Create and play audio
-      const audio = new Audio(audioUrl)
-      audio.preload = "auto"
-      audio.muted = false
-      audio.volume = 1
-      setCurrentAudio(audio)
-
-      const tryPlay = () => {
-        audio.play().catch((error) => {
-          console.error("Audio playback failed:", error)
-          // Autoplay likely blocked → show manual player fallback
-          setPendingAudioUrl(audioUrl)
+        const tryPlay = () => {
+          audio.play().catch((error) => {
+            console.error("Audio playback failed:", error)
+            setPendingAudioUrl(audioUrl)
+            setIsSpeaking(false)
+          })
+        }
+        audio.onloadedmetadata = tryPlay
+        audio.oncanplaythrough = tryPlay
+        audio.ontimeupdate = () => {
+          if (audio.duration) setAudioProgress((audio.currentTime / audio.duration) * 100)
+        }
+        audio.onended = () => {
           setIsSpeaking(false)
-        })
-      }
-
-      audio.onloadedmetadata = tryPlay
-      audio.oncanplaythrough = tryPlay
-
-      audio.ontimeupdate = () => {
-        if (audio.duration) {
-          setAudioProgress((audio.currentTime / audio.duration) * 100)
+          setAudioProgress(0)
+          setCurrentAudio(null)
+          URL.revokeObjectURL(audioUrl)
+        }
+        audio.onerror = (error) => {
+          console.error("Audio error:", error)
+          setIsSpeaking(false)
+          setAudioProgress(0)
+          setCurrentAudio(null)
+          URL.revokeObjectURL(audioUrl)
         }
       }
 
-      audio.onended = () => {
-        setIsSpeaking(false)
-        setAudioProgress(0)
-        setCurrentAudio(null)
-        URL.revokeObjectURL(audioUrl) // Clean up memory
+      const tryElevenLabs = async (): Promise<boolean> => {
+        if (!elevenlabsKey) return false
+        try {
+          const resp = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text.slice(0, 1000), elevenlabsKey, voiceId: elevenlabsVoice || undefined })
+          })
+          if (!resp.ok) throw new Error(await resp.text())
+          const blob = await resp.blob()
+          await playBlob(blob)
+          return true
+        } catch (e) {
+          console.warn('ElevenLabs TTS failed, falling back:', e)
+          return false
+        }
       }
 
-      audio.onerror = (error) => {
-        console.error("Audio error:", error)
-        setIsSpeaking(false)
-        setAudioProgress(0)
-        setCurrentAudio(null)
-        URL.revokeObjectURL(audioUrl)
+      const tryOpenAITTS = async (): Promise<boolean> => {
+        try {
+          const openaiKey = localStorage.getItem('voiceloop_openai_key') || ''
+          if (!openaiKey) return false
+          const resp = await fetch('/api/tts/openai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text.slice(0, 800), openaiKey, voice: 'alloy' })
+          })
+          if (!resp.ok) throw new Error(await resp.text())
+          const blob = await resp.blob()
+          await playBlob(blob)
+          return true
+        } catch (e) {
+          console.warn('OpenAI TTS failed:', e)
+          return false
+        }
+      }
+
+      let ok = false
+      if (provider === 'elevenlabs') ok = await tryElevenLabs()
+      else if (provider === 'openai') ok = await tryOpenAITTS()
+      else ok = (await tryElevenLabs()) || (await tryOpenAITTS())
+      if (!ok) {
+        // Final fallback: use browser Web Speech API if available
+        try {
+          const synth: any = (typeof window !== 'undefined' ? (window as any).speechSynthesis : undefined)
+          if (synth && typeof SpeechSynthesisUtterance !== 'undefined') {
+            const utter = new SpeechSynthesisUtterance(String(text).slice(0, 800))
+            utter.onend = () => {
+              setIsSpeaking(false)
+              setAudioProgress(0)
+              setCurrentAudio(null)
+            }
+            utter.onerror = () => {
+              setIsSpeaking(false)
+              setAudioProgress(0)
+              setCurrentAudio(null)
+            }
+            synth.speak(utter)
+            setIsSpeaking(true)
+            return
+          }
+        } catch {}
+        throw new Error('All TTS providers failed')
       }
 
     } catch (error) {
@@ -295,7 +388,7 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
-        content: `TTS Error: ${error instanceof Error ? error.message : "Failed to generate speech"}`,
+        content: `TTS Error: ${error instanceof Error ? error.message : (typeof error === 'string' ? error : 'Failed to generate speech')}`,
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
@@ -366,6 +459,23 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
                 <span className="text-xs opacity-70">{message.timestamp.toLocaleTimeString()}</span>
               </div>
               <p className="text-sm font-light whitespace-pre-wrap">{message.content}</p>
+              {message.type === "assistant" && (
+                <div className="mt-1 flex items-center justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground hover:text-primary"
+                    onClick={() => {
+                      speakResponse(message.content).catch((e) => console.warn('Speak failed:', e))
+                    }}
+                    disabled={isSpeaking}
+                    title="Speak this response"
+                  >
+                    <Volume2 className="h-3 w-3 mr-1" /> Speak
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -398,6 +508,28 @@ export default function VoiceChat({ fileId, fileName }: VoiceChatProps) {
             ) : (
               <Mic className="h-4 w-4" />
             )}
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={`font-light ${autoSpeak ? 'border-primary text-primary' : 'bg-transparent'}`}
+            onClick={async () => {
+              const next = !autoSpeak
+              setAutoSpeak(next)
+              try { localStorage.setItem('voiceloop_auto_speak', String(next)) } catch {}
+              // Also speak the latest assistant reply immediately for quick feedback
+              if (!isSpeaking) {
+                const lastAssistant = [...messages].reverse().find(m => m.type === 'assistant')
+                if (lastAssistant && lastAssistant.content) {
+                  try { await speakResponse(lastAssistant.content) } catch (e) { console.warn('Speak latest failed:', e) }
+                }
+              }
+            }}
+            title="Toggle auto-speak and speak latest reply"
+          >
+            <Volume2 className="h-4 w-4" />
           </Button>
 
           <Button type="submit" size="sm" className="font-light" disabled={!inputMessage.trim() || isProcessing}>

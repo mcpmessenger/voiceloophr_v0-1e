@@ -13,7 +13,8 @@ export function initializeGlobalStorage() {
 }
 
 export function getGlobalStorage() {
-  return global.uploadedFiles || new Map()
+  // Always initialize once and return the shared map
+  return initializeGlobalStorage()
 }
 
 export function setFileInGlobalStorage(fileId: string, fileData: any) {

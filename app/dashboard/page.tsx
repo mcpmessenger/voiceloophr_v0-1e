@@ -33,7 +33,7 @@ interface Document {
   name: string
   type: string
   size: number
-  status: "processing" | "completed" | "error"
+  status: "processing" | "completed" | "error" | "cancelled"
   uploadedAt: string
   lastAccessed?: string
   summary?: string
@@ -54,6 +54,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [stoppingProcessing, setStoppingProcessing] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [stats, setStats] = useState({
     totalDocuments: 0,
     totalProcessed: 0,
@@ -104,7 +106,7 @@ export default function DashboardPage() {
           name: file.name || 'Document',
           type: file.type || 'text/plain',
           size: file.size || 0,
-          status: file.processed ? 'completed' as const : 'processing' as const,
+          status: file.processingCancelled ? 'cancelled' as const : (file.processed ? 'completed' as const : 'processing' as const),
           uploadedAt: file.uploadedAt || file.processingTime || new Date().toISOString(),
           lastAccessed: undefined,
           summary: file.extractedText ? file.extractedText.substring(0, 200) + '...' : undefined,
@@ -205,6 +207,8 @@ export default function DashboardPage() {
         return "text-yellow-600"
       case "error":
         return "text-red-600"
+      case "cancelled":
+        return "text-gray-600"
       default:
         return "text-gray-600"
     }
@@ -241,7 +245,128 @@ export default function DashboardPage() {
     })
   }
 
-  const deleteDocument = async (docId: string) => {
+  const stopProcessing = async (docId: string, options?: { silent?: boolean }): Promise<{ ok: boolean, message?: string }> => {
+    setStoppingProcessing(docId)
+    try {
+      const response = await fetch('/api/process/stop', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId: docId
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log('✅ Processing stopped successfully:', result)
+        
+        // Update document status in UI
+        setDocuments(prev => prev.map(doc => 
+          doc.id === docId ? { ...doc, status: 'cancelled' as const } : doc
+        ))
+        
+        // Update localStorage
+        try {
+          const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+          if (existing[docId]) {
+            existing[docId].status = 'cancelled'
+            existing[docId].processingCancelled = true
+            existing[docId].cancelledAt = new Date().toISOString()
+            localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+          }
+        } catch (localError) {
+          console.warn('Failed to update localStorage:', localError)
+        }
+        
+        if (!options?.silent) alert('Processing stopped successfully')
+        return { ok: true }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || errorData.details || 'Failed to stop processing'
+        console.error('❌ Failed to stop processing:', errorMessage)
+        // Graceful handling if server lost in-memory file (404)
+        if (String(errorMessage).toLowerCase().includes('file not found')) {
+          setDocuments(prev => prev.map(doc => 
+            doc.id === docId ? { ...doc, status: 'cancelled' as const } : doc
+          ))
+          try {
+            const existing = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+            if (existing[docId]) {
+              existing[docId].status = 'cancelled'
+              existing[docId].processingCancelled = true
+              existing[docId].cancelledAt = new Date().toISOString()
+              localStorage.setItem('voiceloop_uploaded_files', JSON.stringify(existing))
+            }
+          } catch {}
+          if (!options?.silent) alert('Processing marked as cancelled (file not found on server)')
+          return { ok: true, message: 'File not found on server; marked cancelled' }
+        } else {
+          if (!options?.silent) alert(`Failed to stop processing: ${errorMessage}`)
+          return { ok: false, message: errorMessage }
+        }
+      }
+    } catch (error) {
+      console.error("Error stopping processing:", error)
+      if (!options?.silent) alert('Failed to stop processing')
+      return { ok: false, message: 'Unexpected error' }
+    } finally {
+      setStoppingProcessing(null)
+    }
+  }
+
+  const toggleSelect = (docId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(docId)) next.delete(docId); else next.add(docId)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === documents.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(documents.map(d => d.id)))
+    }
+  }
+
+  const bulkStop = async () => {
+    const ids = Array.from(selectedIds)
+    const successes: string[] = []
+    const failures: { id: string, reason: string }[] = []
+    for (const id of ids) {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await stopProcessing(id, { silent: true })
+      if (res.ok) successes.push(id); else failures.push({ id, reason: res.message || 'Unknown error' })
+    }
+    setSelectedIds(new Set())
+    const failureLines = failures.map(f => `- ${documents.find(d => d.id === f.id)?.name || f.id}: ${f.reason}`)
+    alert(`Stopped ${successes.length}/${ids.length} items.${failureLines.length ? `\nFailures:\n${failureLines.join('\n')}` : ''}`)
+  }
+
+  const bulkDelete = async () => {
+    setDeleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const successes: string[] = []
+      const failures: { id: string, reason: string }[] = []
+      for (const id of ids) {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await deleteDocument(id, { silent: true })
+        if (res.ok) successes.push(id); else failures.push({ id, reason: res.message || 'Unknown error' })
+      }
+      const successNames = successes.map(id => documents.find(d => d.id === id)?.name || id)
+      const failureLines = failures.map(f => `- ${documents.find(d => d.id === f.id)?.name || f.id}: ${f.reason}`)
+      alert(`Deleted ${successes.length}/${ids.length} items:\n${successNames.map(n=>`- ${n}`).join('\n')}${failureLines.length ? `\nFailures:\n${failureLines.join('\n')}` : ''}`)
+    } finally {
+      setDeleting(false)
+      setSelectedIds(new Set())
+    }
+  }
+
+  const deleteDocument = async (docId: string, options?: { silent?: boolean }): Promise<{ ok: boolean, message?: string }> => {
     setDeleting(true)
     try {
       // Clean up RAG data (document chunks and embeddings)
@@ -288,13 +413,13 @@ export default function DashboardPage() {
       // Remove from UI
       setDocuments(prev => prev.filter(doc => doc.id !== docId))
       setDeleteConfirmDoc(null)
-      
-      // Show success message
-      alert('Document deleted successfully')
+      if (!options?.silent) alert('Document deleted successfully')
+      return { ok: true }
       
     } catch (error) {
       console.error("Error deleting document:", error)
-      alert('Failed to delete document')
+      if (!options?.silent) alert('Failed to delete document')
+      return { ok: false, message: 'Delete failed' }
     } finally {
       setDeleting(false)
     }
@@ -425,6 +550,23 @@ export default function DashboardPage() {
               </Button>
             </div>
 
+            {documents.length > 0 && (
+              <div className="flex items-center justify-between p-2 border rounded-md bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={selectedIds.size === documents.length} onChange={toggleSelectAll} />
+                  <span className="text-sm text-muted-foreground">Select all</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="font-light bg-transparent" onClick={bulkStop} disabled={selectedIds.size === 0 || deleting}>
+                    Stop Selected
+                  </Button>
+                  <Button variant="destructive" size="sm" className="font-light" onClick={bulkDelete} disabled={selectedIds.size === 0 || deleting}>
+                    {deleting ? 'Deleting...' : 'Delete Selected'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               {loading && documents.length === 0 ? (
                 <div className="text-center py-8">
@@ -445,6 +587,7 @@ export default function DashboardPage() {
                 documents.map((doc) => (
                 <Card key={doc.id} className="p-6 border-thin hover:border-accent/50 transition-colors">
                   <div className="flex items-start gap-4">
+                    <div className="pt-1"><input type="checkbox" checked={selectedIds.has(doc.id)} onChange={() => toggleSelect(doc.id)} /></div>
                     <div className="flex-shrink-0">{getFileIcon(doc.type, doc.name)}</div>
 
                     <div className="flex-1 min-w-0">
@@ -487,6 +630,17 @@ export default function DashboardPage() {
                             <span className="text-muted-foreground font-light">75%</span>
                           </div>
                           <Progress value={75} className="h-2" />
+                          <div className="flex items-center gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="font-light bg-transparent border-2 border-red-300 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700 transition-all duration-200"
+                              onClick={() => stopProcessing(doc.id)}
+                              disabled={stoppingProcessing === doc.id}
+                            >
+                              {stoppingProcessing === doc.id ? "Stopping..." : "Stop Processing"}
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">

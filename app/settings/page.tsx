@@ -14,19 +14,27 @@ export default function SettingsPage() {
   const [elevenlabsKey, setElevenlabsKey] = useState("")
   const [showOpenaiKey, setShowOpenaiKey] = useState(false)
   const [showElevenlabsKey, setShowElevenlabsKey] = useState(false)
+  const [ttsProvider, setTtsProvider] = useState<'elevenlabs' | 'openai' | 'auto'>("auto")
+  const [elevenlabsVoice, setElevenlabsVoice] = useState<string>("")
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     // Load saved keys from localStorage
     const savedOpenaiKey = localStorage.getItem("voiceloop_openai_key") || ""
     const savedElevenlabsKey = localStorage.getItem("voiceloop_elevenlabs_key") || ""
+    const savedProvider = (localStorage.getItem("voiceloop_tts_provider") as any) || 'auto'
+    const savedVoice = localStorage.getItem("voiceloop_elevenlabs_voice") || ""
     setOpenaiKey(savedOpenaiKey)
     setElevenlabsKey(savedElevenlabsKey)
+    setTtsProvider(savedProvider === 'elevenlabs' || savedProvider === 'openai' ? savedProvider : 'auto')
+    setElevenlabsVoice(savedVoice)
   }, [])
 
   const handleSave = () => {
     localStorage.setItem("voiceloop_openai_key", openaiKey)
     localStorage.setItem("voiceloop_elevenlabs_key", elevenlabsKey)
+    localStorage.setItem("voiceloop_tts_provider", ttsProvider)
+    localStorage.setItem("voiceloop_elevenlabs_voice", elevenlabsVoice)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -142,6 +150,60 @@ export default function SettingsPage() {
                 {elevenlabsKey && !showElevenlabsKey && (
                   <p className="text-xs text-muted-foreground font-mono">Current: {maskKey(elevenlabsKey)}</p>
                 )}
+              </div>
+            </Card>
+
+            {/* TTS Settings */}
+            <Card className="p-6 border-thin">
+              <h3 className="text-lg font-light mb-2">Text-to-Speech</h3>
+              <p className="text-sm text-muted-foreground mb-4">Choose provider and voice for spoken responses.</p>
+              <div className="space-y-3">
+                <Label className="text-sm font-light">Provider</Label>
+                <div className="flex gap-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="tts" value="auto" checked={ttsProvider === 'auto'} onChange={() => setTtsProvider('auto')} />
+                    Auto (prefer ElevenLabs, fallback to OpenAI)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="tts" value="elevenlabs" checked={ttsProvider === 'elevenlabs'} onChange={() => setTtsProvider('elevenlabs')} />
+                    ElevenLabs
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="tts" value="openai" checked={ttsProvider === 'openai'} onChange={() => setTtsProvider('openai')} />
+                    OpenAI
+                  </label>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-light">ElevenLabs Voice (ID or name)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter voice name or ID (e.g., Jessica)"
+                      value={elevenlabsVoice}
+                      onChange={(e) => setElevenlabsVoice(e.target.value)}
+                      className="font-mono text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="font-light"
+                      onClick={async () => {
+                        try {
+                          const key = localStorage.getItem('voiceloop_elevenlabs_key')
+                          if (!key) { alert('Add ElevenLabs key first'); return }
+                          const resp = await fetch('/api/tts/voices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ elevenlabsKey: key }) })
+                          const data = await resp.json()
+                          if (!resp.ok || !data?.voices) { alert(data?.error || 'Failed to fetch voices'); return }
+                          const choice = window.prompt('Available voices (copy a name or ID):\n\n' + data.voices.map((v: any) => `${v.name} — ${v.id}`).join('\n'))
+                          if (choice) setElevenlabsVoice(choice)
+                        } catch (e) { alert('Failed to load voices'); }
+                      }}
+                    >
+                      List Voices
+                    </Button>
+                  </div>
+                </div>
               </div>
             </Card>
 

@@ -12,9 +12,10 @@ import {
 } from "lucide-react"
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Set up PDF.js worker
+// Set up PDF.js worker matching the library's version to avoid mismatch warnings
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+  // Use CDN worker that matches the bundled pdfjs version
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
 }
 
 interface ClientPDFViewerProps {

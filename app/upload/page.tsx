@@ -397,6 +397,29 @@ export default function UploadPage() {
     if (!fileToCancel) return
 
     try {
+      // Call API to stop processing on server side
+      if (fileToCancel.fileId) {
+        try {
+          const stopResponse = await fetch('/api/process/stop', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              fileId: fileToCancel.fileId
+            })
+          })
+
+          if (stopResponse.ok) {
+            console.log('✅ Server-side processing stopped successfully')
+          } else {
+            console.warn('⚠️ Failed to stop server-side processing:', await stopResponse.text())
+          }
+        } catch (apiError) {
+          console.warn('⚠️ API call to stop processing failed:', apiError)
+        }
+      }
+
       // Abort any ongoing requests
       if (fileToCancel.abortController) {
         fileToCancel.abortController.abort()
