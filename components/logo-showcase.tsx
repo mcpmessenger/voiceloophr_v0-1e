@@ -9,19 +9,19 @@ const logos = [
     alt: "VoiceLoop"
   },
   {
-    src: "/images/OpenAI.png",
+    src: "https://automationalien.s3.us-east-1.amazonaws.com/OpenAI.png",
     alt: "OpenAI"
   },
   {
-    src: "/images/elevenlabsblk.png",
+    src: "https://automationalien.s3.us-east-1.amazonaws.com/elevenlabsblk.png",
     alt: "ElevenLabs"
   },
   {
-    src: "/images/supabase-logo-wordmark--dark.svg",
+    src: "https://automationalien.s3.us-east-1.amazonaws.com/supabase-logo-wordmark--dark.svg",
     alt: "Supabase"
   },
   {
-    src: "/images/AWS_textract_logo.webp",
+    src: "https://automationalien.s3.us-east-1.amazonaws.com/amazon-textract.webp",
     alt: "AWS Textract"
   }
 ]
@@ -48,9 +48,9 @@ export default function LogoShowcase() {
         {[...logos, ...logos, ...logos, ...logos].map((logo, index) => (
           <div
             key={`${logo.alt}-${index}`}
-            className="flex items-center justify-center min-w-[200px] group"
+            className="flex items-center justify-center min-w-[200px]"
           >
-            <div className="h-24 w-24 transition-transform duration-500 group-hover:scale-110">
+            <div className="h-24 w-24">
               <Image
                 src={logo.src}
                 alt={logo.alt}
@@ -58,6 +58,7 @@ export default function LogoShowcase() {
                 height={96}
                 className="h-full w-full object-contain"
                 sizes="96px"
+                unoptimized
               />
             </div>
           </div>

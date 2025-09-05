@@ -122,10 +122,6 @@
   }
   
   .animate-scroll-x {
-    animation: scroll-x 60s linear infinite;
-  }
-  
-  .animate-scroll-x:hover {
-    animation-play-state: paused;
+    animation: scroll-x 45s linear infinite;
   }
 }
