@@ -115,21 +115,30 @@ export function DocumentViewer({
   const fetchFileData = async (fileId: string) => {
     try {
       setLoadingFileData(true)
+      console.log(`🔍 DocumentViewer: Fetching file data for ID: ${fileId}`)
       const response = await fetch(`/api/files/${fileId}`)
+      console.log(`📡 DocumentViewer: Response status: ${response.status}`)
       
       if (!response.ok) {
-        throw new Error('Failed to fetch file data')
+        const errorText = await response.text()
+        console.error(`❌ DocumentViewer: API error ${response.status}:`, errorText)
+        throw new Error(`Failed to fetch file data: ${response.status} ${response.statusText}`)
       }
       
       const result = await response.json()
+      console.log(`📄 DocumentViewer: Response data:`, result)
+      
       if (result.success && result.file?.buffer) {
+        console.log(`✅ DocumentViewer: File data loaded successfully`)
         setFileData(result.file.buffer)
         return result.file.buffer
       } else {
-        throw new Error('No file data available')
+        console.error(`❌ DocumentViewer: No file data in response:`, result)
+        throw new Error('No file data available in response')
       }
     } catch (error) {
-      console.error('Error fetching file data:', error)
+      console.error('❌ DocumentViewer: Error fetching file data:', error)
+      setError(error instanceof Error ? error.message : 'Failed to fetch file data')
       setFileData(null)
       return null
     } finally {

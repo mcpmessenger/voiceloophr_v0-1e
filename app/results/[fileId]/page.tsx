@@ -12,8 +12,8 @@ import { LocalStorageManager } from "@/lib/utils/storage"
 import OpenAISettings from "@/components/OpenAISettings"
 import UnifiedVoiceChat from "@/components/voice-chat"
 import { DocumentViewer } from "@/components/DocumentViewer"
-import SaveForSearchButton from "@/components/save-for-search-button"
-import SaveToDatabaseButton from "@/components/save-to-database-button"
+import { UnifiedSaveButton } from "@/components/unified-save-button"
+import { Navigation } from "@/components/navigation"
 
 interface ProcessedFile {
   id: string
@@ -267,14 +267,7 @@ export default function ResultsPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b-2 border-primary/20 bg-gradient-to-r from-background to-primary/5">
-          <div className="container mx-auto px-6 py-4">
-            <div className="flex items-center gap-3">
-              <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={40} height={40} className="rounded-lg" />
-              <span className="text-xl font-light text-foreground">VoiceLoop</span>
-            </div>
-          </div>
-        </header>
+        <Navigation />
         
         <section className="py-8 px-6">
           <div className="container mx-auto max-w-4xl text-center">
@@ -313,22 +306,19 @@ export default function ResultsPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b-2 border-primary/20 bg-gradient-to-r from-background to-primary/5">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={40} height={40} className="rounded-lg" />
-              <span className="text-xl font-light text-foreground">VoiceLoop</span>
-            </div>
-            <Button variant="outline" size="sm" className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md" asChild>
-              <Link href="/upload">
-                <ArrowLeft className="mr-2 h-4 w-4 text-primary" />
-                Upload Another
-              </Link>
-            </Button>
-          </div>
+      <Navigation />
+      
+      {/* Upload Another Button */}
+      <div className="container mx-auto px-6 py-4">
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md" asChild>
+            <Link href="/upload">
+              <ArrowLeft className="mr-2 h-4 w-4 text-primary" />
+              Upload Another
+            </Link>
+          </Button>
         </div>
-      </header>
+      </div>
 
       {/* Results Content */}
       <section className="py-8 px-6">
@@ -359,31 +349,15 @@ export default function ResultsPage() {
             }}
           />
 
-          {/* Save Options */}
-          <div className="mt-6 space-y-4">
-            {/* Save to Database Button */}
-            <SaveToDatabaseButton
+          {/* Unified Save Option */}
+          <div className="mt-6">
+            <UnifiedSaveButton
               documentId={fileData.id}
-              fileName={fileData.name}
-              text={fileData.extractedText}
+              documentName={fileData.name}
+              extractedText={fileData.extractedText}
               userId={undefined}
-              isSaved={false} // This will be updated based on localStorage
-              onSaved={() => {
-                // Refresh the page or update state
-                window.location.reload()
-              }}
-            />
-
-            {/* Save for Search Button */}
-            <SaveForSearchButton
-              documentId={fileData.id}
-              fileName={fileData.name}
-              text={fileData.extractedText}
-              userId={undefined}
-              isSearchable={false} // This will be updated based on localStorage
-              searchChunks={0}
-              onSaved={() => {
-                // Refresh the page or update state
+              onSaveComplete={() => {
+                // Refresh the page to show updated state
                 window.location.reload()
               }}
             />

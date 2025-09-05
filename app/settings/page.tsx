@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Key, Save, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Key, Save, Eye, EyeOff, LogIn, LogOut } from "lucide-react"
+import { Navigation } from "@/components/navigation"
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
+import { AuthModal } from '@/components/auth-modal'
 
 export default function SettingsPage() {
   const [openaiKey, setOpenaiKey] = useState("")
@@ -17,6 +20,8 @@ export default function SettingsPage() {
   const [ttsProvider, setTtsProvider] = useState<'elevenlabs' | 'openai' | 'auto'>("auto")
   const [elevenlabsVoice, setElevenlabsVoice] = useState<string>("")
   const [saved, setSaved] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
 
   useEffect(() => {
     // Load saved keys from localStorage
@@ -28,6 +33,17 @@ export default function SettingsPage() {
     setElevenlabsKey(savedElevenlabsKey)
     setTtsProvider(savedProvider === 'elevenlabs' || savedProvider === 'openai' ? savedProvider : 'auto')
     setElevenlabsVoice(savedVoice)
+
+    // Load user authentication status
+    const loadUser = async () => {
+      try {
+        const supabase = getSupabaseBrowser()
+        if (!supabase) return
+        const { data: { user } } = await supabase.auth.getUser()
+        setUserId(user?.id ?? null)
+      } catch {}
+    }
+    loadUser()
   }, [])
 
   const handleSave = () => {
@@ -44,112 +60,196 @@ export default function SettingsPage() {
     return key.slice(0, 8) + "..." + key.slice(-4)
   }
 
+  const handleOAuth = async (provider: 'google' | 'linkedin_oidc') => {
+    try {
+      const supabase = getSupabaseBrowser()
+      if (!supabase) return
+      const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined
+      await supabase.auth.signInWithOAuth({ provider, options: { redirectTo, queryParams: { prompt: 'select_account' } } })
+    } catch (e) {
+      console.error('Auth error:', e)
+    }
+  }
+
+  const handleEmailMagic = async () => {
+    const email = prompt('Enter your email for a magic link')
+    if (!email) return
+    try {
+      const supabase = getSupabaseBrowser()
+      if (!supabase) return
+      await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined } })
+      alert('Check your email for the sign-in link.')
+    } catch (e) {
+      console.error('Email sign-in error:', e)
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      const supabase = getSupabaseBrowser()
+      await supabase?.auth.signOut()
+      setUserId(null)
+    } catch (e) {
+      console.error('Sign out error:', e)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-thin border-border/50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={40} height={40} className="rounded-lg" />
-              <span className="text-xl font-light text-foreground">VoiceLoop</span>
-            </div>
-            <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
       {/* Settings Content */}
       <section className="py-12 px-6">
         <div className="container mx-auto max-w-2xl">
           <div className="mb-8">
-            <h1 className="text-3xl font-light text-foreground mb-2">API Settings</h1>
-            <p className="text-muted-foreground font-light">
-              Configure your API keys to enable AI processing and voice features
+            <h1 className="text-3xl font-montserrat-light text-foreground mb-2">Settings</h1>
+            <p className="text-muted-foreground font-montserrat-light">
+              Configure your account and API keys to enable AI processing and voice features
             </p>
           </div>
 
           <div className="space-y-6">
-            {/* OpenAI API Key */}
+            {/* Authentication Section */}
+            <Card className="p-6 border-thin">
+              <div className="flex items-center gap-3 mb-4">
+                {userId ? <LogOut className="h-5 w-5 text-accent" /> : <LogIn className="h-5 w-5 text-accent" />}
+                <h2 className="text-xl font-montserrat-light">Account</h2>
+              </div>
+              
+              {userId ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground font-montserrat-light">
+                    You are signed in. Your documents and settings are synced across devices.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    className="font-montserrat-light bg-transparent"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground font-montserrat-light">
+                    Sign in to sync your documents and settings across devices.
+                  </p>
+                  <div className="flex gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="font-montserrat-light bg-transparent"
+                      onClick={() => handleOAuth('google')}
+                    >
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign in with Google
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="font-montserrat-light bg-transparent"
+                      onClick={() => handleOAuth('linkedin_oidc')}
+                    >
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign in with LinkedIn
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="font-montserrat-light bg-transparent"
+                      onClick={handleEmailMagic}
+                    >
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Magic Link
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* API Settings Section */}
             <Card className="p-6 border-thin">
               <div className="flex items-center gap-3 mb-4">
                 <Key className="h-5 w-5 text-accent" />
-                <h2 className="text-xl font-light">OpenAI API Key</h2>
+                <h2 className="text-xl font-montserrat-light">API Settings</h2>
               </div>
-              <p className="text-sm text-muted-foreground font-light mb-4">
-                Required for document summarization (GPT-4) and audio transcription (Whisper)
+              <p className="text-sm text-muted-foreground font-montserrat-light mb-4">
+                Configure your API keys to enable AI processing and voice features
               </p>
 
-              <div className="space-y-3">
-                <Label htmlFor="openai-key" className="text-sm font-light">
-                  API Key
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="openai-key"
-                    type={showOpenaiKey ? "text" : "password"}
-                    placeholder="sk-..."
-                    value={openaiKey}
-                    onChange={(e) => setOpenaiKey(e.target.value)}
-                    className="pr-10 font-mono text-sm"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowOpenaiKey(!showOpenaiKey)}
-                  >
-                    {showOpenaiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
+              {/* OpenAI API Key */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-montserrat-light mb-2">OpenAI API Key</h3>
+                  <p className="text-sm text-muted-foreground font-montserrat-light mb-4">
+                    Required for document summarization (GPT-4) and audio transcription (Whisper)
+                  </p>
                 </div>
-                {openaiKey && !showOpenaiKey && (
-                  <p className="text-xs text-muted-foreground font-mono">Current: {maskKey(openaiKey)}</p>
-                )}
-              </div>
-            </Card>
 
-            {/* ElevenLabs API Key */}
-            <Card className="p-6 border-thin">
-              <div className="flex items-center gap-3 mb-4">
-                <Key className="h-5 w-5 text-secondary" />
-                <h2 className="text-xl font-light">ElevenLabs API Key</h2>
-              </div>
-              <p className="text-sm text-muted-foreground font-light mb-4">
-                Required for high-quality text-to-speech and voice responses
-              </p>
-
-              <div className="space-y-3">
-                <Label htmlFor="elevenlabs-key" className="text-sm font-light">
-                  API Key
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="elevenlabs-key"
-                    type={showElevenlabsKey ? "text" : "password"}
-                    placeholder="sk_..."
-                    value={elevenlabsKey}
-                    onChange={(e) => setElevenlabsKey(e.target.value)}
-                    className="pr-10 font-mono text-sm"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowElevenlabsKey(!showElevenlabsKey)}
-                  >
-                    {showElevenlabsKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
+                <div className="space-y-3">
+                  <Label htmlFor="openai-key" className="text-sm font-montserrat-light">
+                    API Key
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="openai-key"
+                      type={showOpenaiKey ? "text" : "password"}
+                      placeholder="sk-..."
+                      value={openaiKey}
+                      onChange={(e) => setOpenaiKey(e.target.value)}
+                      className="pr-10 font-mono text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+                    >
+                      {showOpenaiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {openaiKey && !showOpenaiKey && (
+                    <p className="text-xs text-muted-foreground font-mono">Current: {maskKey(openaiKey)}</p>
+                  )}
                 </div>
-                {elevenlabsKey && !showElevenlabsKey && (
-                  <p className="text-xs text-muted-foreground font-mono">Current: {maskKey(elevenlabsKey)}</p>
-                )}
+              </div>
+
+              {/* ElevenLabs API Key */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-montserrat-light mb-2">ElevenLabs API Key</h3>
+                  <p className="text-sm text-muted-foreground font-montserrat-light mb-4">
+                    Required for high-quality text-to-speech and voice responses
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="elevenlabs-key" className="text-sm font-montserrat-light">
+                    API Key
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="elevenlabs-key"
+                      type={showElevenlabsKey ? "text" : "password"}
+                      placeholder="sk_..."
+                      value={elevenlabsKey}
+                      onChange={(e) => setElevenlabsKey(e.target.value)}
+                      className="pr-10 font-mono text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowElevenlabsKey(!showElevenlabsKey)}
+                    >
+                      {showElevenlabsKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {elevenlabsKey && !showElevenlabsKey && (
+                    <p className="text-xs text-muted-foreground font-mono">Current: {maskKey(elevenlabsKey)}</p>
+                  )}
+                </div>
               </div>
             </Card>
 
@@ -233,6 +333,8 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   )
 }

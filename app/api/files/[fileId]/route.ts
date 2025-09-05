@@ -25,8 +25,14 @@ export async function GET(
     
     if (!fileData) {
       console.log(`❌ File not found: ${fileId}`)
+      console.log(`📊 Available files in storage:`, Array.from(storage.keys()))
       return NextResponse.json(
-        { error: 'File not found' },
+        { 
+          error: 'File not found',
+          requestedFileId: fileId,
+          availableFiles: Array.from(storage.keys()),
+          storageSize: storage.size
+        },
         { status: 404 }
       )
     }

@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import GuestModeIndicator from "@/components/guest-mode-indicator"
 import { LogoLoader } from "@/components/logo-loader"
+import { Navigation } from "@/components/navigation"
 
 interface Document {
   id: string
@@ -428,34 +429,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-thin border-border/50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={40} height={40} className="rounded-lg" />
-              <span className="text-xl font-light text-foreground">VoiceLoop</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="font-light bg-transparent" 
-                onClick={loadDocuments}
-                disabled={loading}
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
-              <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
-                <Link href="/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navigation showDashboardButton={false} />
 
       {/* Guest Mode Indicator */}
       <div className="container mx-auto px-6 py-4">
@@ -467,7 +441,7 @@ export default function DashboardPage() {
       <div className="container mx-auto px-6 py-8 max-w-7xl">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-light text-foreground mb-2">Dashboard</h1>
+          <h1 className="text-3xl font-montserrat-light text-foreground mb-2">Dashboard</h1>
           <p className="text-muted-foreground font-montserrat-light">
             Manage your documents and track your AI processing activity
           </p>
@@ -479,8 +453,8 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <FileText className="h-8 w-8 text-primary" />
               <div>
-                <p className="text-2xl font-light text-foreground">{stats.totalDocuments}</p>
-                <p className="text-sm text-muted-foreground font-light">Total Documents</p>
+                <p className="text-2xl font-montserrat-light text-foreground">{stats.totalDocuments}</p>
+                <p className="text-sm text-muted-foreground font-montserrat-light">Total Documents</p>
               </div>
             </div>
           </Card>
@@ -489,8 +463,8 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <Activity className="h-8 w-8 text-secondary" />
               <div>
-                <p className="text-2xl font-light text-foreground">{stats.totalProcessed}</p>
-                <p className="text-sm text-muted-foreground font-light">Processed</p>
+                <p className="text-2xl font-montserrat-light text-foreground">{stats.totalProcessed}</p>
+                <p className="text-sm text-muted-foreground font-montserrat-light">Processed</p>
               </div>
             </div>
           </Card>
@@ -499,8 +473,8 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <Search className="h-8 w-8 text-accent" />
               <div>
-                <p className="text-2xl font-light text-foreground">{stats.totalSearches}</p>
-                <p className="text-sm text-muted-foreground font-light">Searches</p>
+                <p className="text-2xl font-montserrat-light text-foreground">{stats.totalSearches}</p>
+                <p className="text-sm text-muted-foreground font-montserrat-light">Searches</p>
               </div>
             </div>
           </Card>
@@ -509,8 +483,8 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <MessageCircle className="h-8 w-8 text-primary" />
               <div>
-                <p className="text-2xl font-light text-foreground">{stats.totalChats}</p>
-                <p className="text-sm text-muted-foreground font-light">Voice Chats</p>
+                <p className="text-2xl font-montserrat-light text-foreground">{stats.totalChats}</p>
+                <p className="text-sm text-muted-foreground font-montserrat-light">Voice Chats</p>
               </div>
             </div>
           </Card>
