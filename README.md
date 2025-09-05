@@ -140,6 +140,17 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 
 ## 🔗 Platform Integration Setup
 
+### Permissions & OAuth Scopes
+
+- Google Drive
+  - Read: `https://www.googleapis.com/auth/drive.readonly`
+  - Write (Save to Drive): `https://www.googleapis.com/auth/drive.file`
+  - We request consent with `prompt=consent&access_type=offline` to ensure a fresh token.
+
+- LinkedIn (OIDC)
+  - Core: `openid profile email` (no app review needed)
+  - Optional (requires review): `w_member_social` (post as user), `r_liteprofile`, `r_emailaddress`
+
 ### **LinkedIn Professional Network Setup**
 
 1. **Create LinkedIn App**
@@ -149,7 +160,8 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 
 2. **Configure LinkedIn OAuth**
    - Copy Client ID and Client Secret to environment variables
-   - Enable required scopes: `r_liteprofile`, `r_emailaddress`, `w_member_social`
+   - Recommended scopes (OIDC): `openid`, `profile`, `email`
+   - Optional (requires LinkedIn review): `w_member_social` (publish posts), `r_liteprofile`, `r_emailaddress`
 
 3. **Professional Data Import**
    - Profile information automatically imported on sign-in
@@ -164,7 +176,9 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
    - Create OAuth 2.0 credentials
 
 2. **Configure Drive Permissions**
-   - Add scope: `https://www.googleapis.com/auth/drive.readonly`
+   - Scopes used: 
+     - Read: `https://www.googleapis.com/auth/drive.readonly`
+     - Write (optional, for "Save to Drive"): `https://www.googleapis.com/auth/drive.file`
    - Set redirect URI: `https://your-domain.com/auth/callback`
 
 3. **Document Import Features**
