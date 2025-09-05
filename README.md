@@ -32,6 +32,13 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 - **Guest Mode** - Try the platform without registration
 - **Row Level Security** - Data protection and privacy
 
+### 🔗 **Rich Platform Integrations**
+- **LinkedIn Professional Network** - Import profile data, connections, and professional content
+- **Google Drive Integration** - Seamless document import from Drive folders
+- **Cross-Platform Document Linking** - Connect LinkedIn posts to Drive documents
+- **Professional Context Analysis** - Industry-specific document insights
+- **Network Intelligence** - Leverage professional connections for document discovery
+
 ### 💾 **Flexible Storage Options**
 - **Database Storage** - Persistent document storage with Supabase
 - **Local Storage** - Guest mode with browser-based storage
@@ -111,13 +118,16 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
    
-   # Google OAuth (Optional)
-   GOOGLE_CLIENT_ID=your_google_client_id
-   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   # Google OAuth & Drive Integration
+   GOOGLE_OAUTH_CLIENT_ID=your_google_client_id
+   GOOGLE_OAUTH_CLIENT_SECRET=your_google_client_secret
    
-   # LinkedIn OAuth (Optional)
+   # LinkedIn Professional Network Integration
    LINKEDIN_CLIENT_ID=your_linkedin_client_id
    LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
+   
+   # App Configuration
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
 
 4. **Start Development Server**
@@ -127,6 +137,62 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 
 5. **Open in Browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 🔗 Platform Integration Setup
+
+### Permissions & OAuth Scopes
+
+- Google Drive
+  - Read: `https://www.googleapis.com/auth/drive.readonly`
+  - Write (Save to Drive): `https://www.googleapis.com/auth/drive.file`
+  - We request consent with `prompt=consent&access_type=offline` to ensure a fresh token.
+
+- LinkedIn (OIDC)
+  - Core: `openid profile email` (no app review needed)
+  - Optional (requires review): `w_member_social` (post as user), `r_liteprofile`, `r_emailaddress`
+
+### **LinkedIn Professional Network Setup**
+
+1. **Create LinkedIn App**
+   - Go to [LinkedIn Developer Portal](https://www.linkedin.com/developers/)
+   - Create a new app with "Sign In with LinkedIn" product
+   - Add redirect URI: `https://your-domain.com/auth/callback`
+
+2. **Configure LinkedIn OAuth**
+   - Copy Client ID and Client Secret to environment variables
+   - Recommended scopes (OIDC): `openid`, `profile`, `email`
+   - Optional (requires LinkedIn review): `w_member_social` (publish posts), `r_liteprofile`, `r_emailaddress`
+
+3. **Professional Data Import**
+   - Profile information automatically imported on sign-in
+   - Connection network data available for document sharing
+   - Industry context used for document categorization
+
+### **Google Drive Integration Setup**
+
+1. **Enable Google Drive API**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Enable Google Drive API and Google+ API
+   - Create OAuth 2.0 credentials
+
+2. **Configure Drive Permissions**
+   - Scopes used: 
+     - Read: `https://www.googleapis.com/auth/drive.readonly`
+     - Write (optional, for "Save to Drive"): `https://www.googleapis.com/auth/drive.file`
+   - Set redirect URI: `https://your-domain.com/auth/callback`
+
+3. **Document Import Features**
+   - Import entire folder structures
+   - Auto-sync with Drive changes
+   - Extract collaboration metadata
+   - Cross-link with LinkedIn content
+
+### **Cross-Platform Intelligence**
+
+- **Unified Dashboard** - All documents in one view
+- **Smart Tagging** - Automatic source identification
+- **Relationship Mapping** - Connect content across platforms
+- **Professional Analytics** - Industry and network insights
 
 ## 📖 Usage Guide
 
@@ -190,6 +256,63 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 - **Error Recovery** - Fallback methods when primary parsing fails
 - **Format Detection** - Automatic file type recognition
 - **Quality Assessment** - Confidence scoring for extracted content
+
+## 🔗 Rich Platform Integrations
+
+### **LinkedIn Professional Network Integration**
+
+#### **Profile & Network Data**
+- **Professional Profile Import** - Name, headline, industry, current company
+- **Connection Network** - Import professional connections for document sharing
+- **Career Timeline** - Past positions and career progression data
+- **Industry Context** - Documents tagged by professional industry
+
+#### **LinkedIn Content Types**
+- **LinkedIn Posts** - Import and analyze your professional posts
+- **LinkedIn Articles** - Long-form content analysis and insights
+- **Company Updates** - Company page content and announcements
+- **Job Descriptions** - Saved job postings for analysis
+- **Professional Analytics** - Post performance and engagement data
+
+#### **Professional Intelligence**
+- **Industry Analysis** - Documents categorized by industry relevance
+- **Network Insights** - Discover who in your network shares similar content
+- **Company Intelligence** - Document analysis with company context
+- **Career Progression** - Timeline analysis of professional documents
+
+### **Google Drive Integration**
+
+#### **Enhanced Document Import**
+- **Folder Structure Import** - Import entire folder hierarchies with organization
+- **Smart Filtering** - Filter by document type, creation date, folder location
+- **Metadata Extraction** - File properties, sharing settings, and collaboration info
+- **Auto-Sync Capabilities** - Periodic updates from Google Drive changes
+
+#### **Document Organization**
+- **Auto-Tagging System** - Documents automatically tagged by source (LinkedIn, Drive, Upload)
+- **Timeline View** - Documents organized by creation and import dates
+- **Collaboration Tracking** - See who shared documents and when
+- **Cross-Platform Linking** - Connect LinkedIn posts to related Drive documents
+
+#### **Advanced Features**
+- **Real-time Sync** - Automatic updates when Drive files change
+- **Sharing Intelligence** - Understand document collaboration patterns
+- **Version Control** - Track document changes across platforms
+- **Export Capabilities** - Generate reports combining data from all sources
+
+### **Cross-Platform Intelligence**
+
+#### **Unified Document Experience**
+- **Single Dashboard** - View all documents from LinkedIn, Drive, and uploads
+- **Smart Recommendations** - AI suggests related documents across platforms
+- **Contextual Search** - Find documents by professional context, not just keywords
+- **Relationship Mapping** - Visualize connections between documents and people
+
+#### **Professional Analytics**
+- **Content Performance** - Track how LinkedIn content relates to Drive documents
+- **Network Analysis** - Understand document sharing patterns in your network
+- **Industry Trends** - Identify trending topics across your professional content
+- **Collaboration Insights** - Discover effective document collaboration strategies
 
 ### **AI Integration**
 - **GPT-4 Summarization** - Intelligent document summaries
