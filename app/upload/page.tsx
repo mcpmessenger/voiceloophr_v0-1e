@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react"
 import { LogoLoader } from "@/components/logo-loader"
+import { Navigation } from "@/components/navigation"
 
 
 interface UploadedFile {
@@ -872,29 +873,7 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b-2 border-primary/20 bg-gradient-to-r from-background to-primary/5">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-3">
-                <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={40} height={40} className="rounded-lg" />
-                <span className="text-xl font-light text-foreground">VoiceLoop</span>
-              </Link>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md" asChild>
-                <Link href="/settings">Settings</Link>
-              </Button>
-              <Button variant="outline" size="sm" className="font-light bg-transparent border-2 border-primary/30 hover:border-primary hover:bg-primary/5 text-primary hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md" asChild>
-                <Link href="/">
-                  <ArrowLeft className="mr-2 h-4 w-4 text-primary" />
-                  Back to Home
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
       <div className="container mx-auto px-6 py-12 max-w-4xl">
         <div className="text-center mb-8">
