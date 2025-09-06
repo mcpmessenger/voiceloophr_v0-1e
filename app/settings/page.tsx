@@ -65,7 +65,17 @@ export default function SettingsPage() {
       const supabase = getSupabaseBrowser()
       if (!supabase) return
       const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined
-      await supabase.auth.signInWithOAuth({ provider, options: { redirectTo, queryParams: { prompt: 'select_account' } } })
+      const scopes = provider === 'google'
+        ? 'openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file'
+        : 'openid profile email'
+      await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo,
+          scopes,
+          queryParams: { prompt: 'consent select_account', access_type: 'offline' }
+        }
+      })
     } catch (e) {
       console.error('Auth error:', e)
     }

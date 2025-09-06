@@ -22,14 +22,17 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
+    // Ensure we use a valid UUID for the primary key. If client sent a non-UUID id, generate one.
+    const isUuid = typeof id === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(id)
+    const docId = isUuid ? id : crypto.randomUUID()
+
     // Save document to database
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('documents')
       .upsert({
-        id,
+        id: docId,
         file_name: name,
         mime_type: type,
-        file_size: size,
         content: extractedText,
         summary: summary,
         processing_method: processingMethod,
@@ -39,18 +42,35 @@ export async function POST(request: NextRequest) {
       }, { 
         onConflict: 'id' 
       })
+      .select('*')
 
     if (error) {
-      console.error('Save document error:', error)
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Failed to save document' 
-      }, { status: 500 })
+      console.warn('Primary upsert failed, retrying with minimal columns:', error)
+      // Fallback with minimal set of columns present in most schemas
+      const fallback = await supabaseAdmin
+        .from('documents')
+        .upsert({
+          id: docId,
+          file_name: name,
+          content: extractedText
+        }, { onConflict: 'id' })
+        .select('*')
+
+      if (fallback.error) {
+        console.error('Save document error (fallback failed):', fallback.error)
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Failed to save document',
+          details: (fallback.error as any)?.message || fallback.error
+        }, { status: 500 })
+      }
+      data = fallback.data
     }
 
     return NextResponse.json({ 
       success: true, 
-      document: data 
+      document: data,
+      id: docId
     })
   } catch (err) {
     console.error('Save document error:', err)

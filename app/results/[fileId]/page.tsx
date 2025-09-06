@@ -14,6 +14,9 @@ import UnifiedVoiceChat from "@/components/voice-chat"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { UnifiedSaveButton } from "@/components/unified-save-button"
 import { Navigation } from "@/components/navigation"
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
+import GoogleDriveFolderPicker from '@/components/google-drive-folder-picker'
+import PostGenerator from '@/components/post-generator'
 
 interface ProcessedFile {
   id: string
@@ -36,6 +39,10 @@ export default function ResultsPage() {
   const [isBrowser, setIsBrowser] = useState(false)
   // Inline chat (unified component); no modal state needed
   const [error, setError] = useState<string | null>(null)
+  const [isSavingToDrive, setIsSavingToDrive] = useState(false)
+  const [saveToDriveMsg, setSaveToDriveMsg] = useState<string | null>(null)
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false)
+  const [selectedFolder, setSelectedFolder] = useState<{ id: string, name: string } | null>(null)
 
   // Ensure we're in the browser environment
   useEffect(() => {
@@ -131,6 +138,61 @@ export default function ResultsPage() {
       loadResults()
     }
   }, [fileId, isBrowser])
+
+  const saveTextToGoogleDrive = async () => {
+    try {
+      setIsSavingToDrive(true)
+      setSaveToDriveMsg(null)
+      const supabase = getSupabaseBrowser()
+      const { data: { session } } = await supabase!.auth.getSession()
+      const token = (session as any)?.provider_token
+      if (!token) {
+        setSaveToDriveMsg('Sign in with Google first (Settings → Sign in with Google).')
+        return
+      }
+      if (!fileData) {
+        setSaveToDriveMsg('No document loaded.')
+        return
+      }
+
+      const boundary = 'voiceloop-' + Math.random().toString(36).slice(2)
+      const metadata: any = {
+        name: `${fileData.name.replace(/\.[^/.]+$/, '')}-voiceloop`,
+        mimeType: 'application/vnd.google-apps.document'
+      }
+      if (selectedFolder?.id && selectedFolder.id !== 'root') {
+        metadata.parents = [selectedFolder.id]
+      }
+      const body = [
+        `--${boundary}\r\n` +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) + '\r\n',
+        `--${boundary}\r\n` +
+        'Content-Type: text/plain; charset=UTF-8\r\n\r\n' +
+        (fileData.summary ? `Summary\n\n${fileData.summary}\n\n---\n\n` : '') +
+        (fileData.extractedText || '') + '\r\n',
+        `--${boundary}--`
+      ].join('')
+
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(text || 'Drive upload failed')
+      }
+      setSaveToDriveMsg('Saved to Google Drive successfully.')
+    } catch (e: any) {
+      setSaveToDriveMsg(e?.message || 'Failed to save to Google Drive')
+    } finally {
+      setIsSavingToDrive(false)
+    }
+  }
 
   // Generate AI summary from extracted text
   const generateAISummary = async (text: string, fileName: string): Promise<string> => {
@@ -285,6 +347,12 @@ export default function ResultsPage() {
               </Button>
             </div>
           </div>
+
+          {/* LinkedIn Post Generator */}
+          <div className="mt-6">
+            <h3 className="text-lg font-light mb-2">Create LinkedIn-ready Post</h3>
+            <PostGenerator text={fileData.summary || fileData.extractedText} title={fileData.name} />
+          </div>
         </section>
       </div>
     )
@@ -361,7 +429,33 @@ export default function ResultsPage() {
                 window.location.reload()
               }}
             />
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <Button
+                variant="outline"
+                className="font-montserrat-light bg-transparent"
+                onClick={() => setFolderPickerOpen(true)}
+              >
+                {selectedFolder ? `Folder: ${selectedFolder.name}` : 'Choose Drive Folder'}
+              </Button>
+              <Button
+                variant="outline"
+                className="font-montserrat-light bg-transparent"
+                disabled={isSavingToDrive}
+                onClick={saveTextToGoogleDrive}
+              >
+                {isSavingToDrive ? 'Saving to Drive…' : 'Save to Google Drive'}
+              </Button>
+              {saveToDriveMsg && (
+                <span className="text-sm text-muted-foreground">{saveToDriveMsg}</span>
+              )}
+            </div>
           </div>
+
+          <GoogleDriveFolderPicker
+            open={folderPickerOpen}
+            onClose={() => setFolderPickerOpen(false)}
+            onPicked={(f) => setSelectedFolder(f)}
+          />
 
           {/* OpenAI Settings helper */}
           {typeof window !== 'undefined' && !localStorage.getItem('voiceloop_openai_key') && (

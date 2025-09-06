@@ -52,6 +52,7 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 - **Context-Aware Navigation** - Smart button visibility based on current page
 - **Streamlined Interface** - Clean, uncluttered design
 - **Real-time Feedback** - Loading states and progress indicators
+- **Identity Indicator** - Shows the signed-in user's avatar/email in the navbar for clarity
 
 ## 🛠️ Technology Stack
 

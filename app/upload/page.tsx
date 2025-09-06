@@ -13,8 +13,8 @@ import { toast } from "sonner"
 import { Upload, FileText, File, Music, Video, X, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react"
 import { LogoLoader } from "@/components/logo-loader"
 import { Navigation } from "@/components/navigation"
-
-
+import GoogleDriveImport from "@/components/google-drive-import"
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
 interface UploadedFile {
   id: string
   file: File
@@ -46,6 +46,8 @@ export default function UploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const router = useRouter()
 
+  const [driveOpen, setDriveOpen] = useState(false)
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map((file) => ({
       id: Math.random().toString(36).substr(2, 9),
@@ -67,6 +69,23 @@ export default function UploadPage() {
         processFile(uploadedFile.id, uploadedFile)
       }, 1000)
     })
+  }, [])
+
+  const handleDrivePicked = useCallback((file: File) => {
+    const newFile: UploadedFile = {
+      id: Math.random().toString(36).substr(2, 9),
+      file,
+      status: "uploading",
+      progress: 0,
+    }
+    setFiles((prev) => [...prev, newFile])
+    const interval = simulateProgress(newFile.id)
+    if (interval) {
+      setProgressIntervals(prev => new Map(prev).set(newFile.id, interval))
+    }
+    setTimeout(() => {
+      processFile(newFile.id, newFile)
+    }, 800)
   }, [])
 
   const processFile = async (fileId: string, uploadedFile: UploadedFile) => {
@@ -881,6 +900,26 @@ export default function UploadPage() {
           <p className="text-lg text-muted-foreground font-light text-pretty">
             Drag and drop your files or click to browse. We support PDF, Markdown, CSV, audio, and video files.
           </p>
+          <div className="mt-4 flex items-center justify-center">
+            <Button
+              variant="outline"
+              className="font-light bg-transparent"
+              onClick={async () => {
+                try {
+                  const supabase = getSupabaseBrowser()
+                  const { data: { session } } = await supabase!.auth.getSession()
+                  const token = (session as any)?.provider_token
+                  if (!token) {
+                    alert('Sign in with Google first (Settings → Sign in with Google).')
+                    return
+                  }
+                  setDriveOpen(true)
+                } catch {}
+              }}
+            >
+              Import from Google Drive
+            </Button>
+          </div>
         </div>
 
         {/* Upload Zone */}
@@ -1176,6 +1215,12 @@ export default function UploadPage() {
         )}
 
 
+      {/* Google Drive Import Modal */}
+      <GoogleDriveImport
+        open={driveOpen}
+        onClose={() => setDriveOpen(false)}
+        onPicked={handleDrivePicked}
+      />
      </div>
    )
  }

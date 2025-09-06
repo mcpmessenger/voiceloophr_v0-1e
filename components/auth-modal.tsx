@@ -35,13 +35,16 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
       const supabase = getSupabaseBrowser()
       if (!supabase) return
       const redirectTo = `${window.location.origin}/auth/callback`
+      const scopes = provider === 'google'
+        ? 'openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file'
+        : 'openid profile email'
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo,
           skipBrowserRedirect: true,
-          // Request Drive read access along with basic profile
-          scopes: 'openid email profile https://www.googleapis.com/auth/drive.readonly',
+          // Provider-specific scopes
+          scopes,
           queryParams: { prompt: 'consent select_account', access_type: 'offline' }
         }
       })
