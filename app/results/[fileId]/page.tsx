@@ -15,6 +15,8 @@ import { DocumentViewer } from "@/components/DocumentViewer"
 import { UnifiedSaveButton } from "@/components/unified-save-button"
 import { Navigation } from "@/components/navigation"
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
+import GoogleDriveFolderPicker from '@/components/google-drive-folder-picker'
+import PostGenerator from '@/components/post-generator'
 
 interface ProcessedFile {
   id: string
@@ -39,6 +41,8 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSavingToDrive, setIsSavingToDrive] = useState(false)
   const [saveToDriveMsg, setSaveToDriveMsg] = useState<string | null>(null)
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false)
+  const [selectedFolder, setSelectedFolder] = useState<{ id: string, name: string } | null>(null)
 
   // Ensure we're in the browser environment
   useEffect(() => {
@@ -152,9 +156,12 @@ export default function ResultsPage() {
       }
 
       const boundary = 'voiceloop-' + Math.random().toString(36).slice(2)
-      const metadata = {
-        name: `${fileData.name.replace(/\.[^/.]+$/, '')}-voiceloop.txt`,
-        mimeType: 'text/plain'
+      const metadata: any = {
+        name: `${fileData.name.replace(/\.[^/.]+$/, '')}-voiceloop`,
+        mimeType: 'application/vnd.google-apps.document'
+      }
+      if (selectedFolder?.id && selectedFolder.id !== 'root') {
+        metadata.parents = [selectedFolder.id]
       }
       const body = [
         `--${boundary}\r\n` +
@@ -340,6 +347,12 @@ export default function ResultsPage() {
               </Button>
             </div>
           </div>
+
+          {/* LinkedIn Post Generator */}
+          <div className="mt-6">
+            <h3 className="text-lg font-light mb-2">Create LinkedIn-ready Post</h3>
+            <PostGenerator text={fileData.summary || fileData.extractedText} title={fileData.name} />
+          </div>
         </section>
       </div>
     )
@@ -416,7 +429,14 @@ export default function ResultsPage() {
                 window.location.reload()
               }}
             />
-            <div className="mt-3 flex items-center gap-3">
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <Button
+                variant="outline"
+                className="font-montserrat-light bg-transparent"
+                onClick={() => setFolderPickerOpen(true)}
+              >
+                {selectedFolder ? `Folder: ${selectedFolder.name}` : 'Choose Drive Folder'}
+              </Button>
               <Button
                 variant="outline"
                 className="font-montserrat-light bg-transparent"
@@ -430,6 +450,12 @@ export default function ResultsPage() {
               )}
             </div>
           </div>
+
+          <GoogleDriveFolderPicker
+            open={folderPickerOpen}
+            onClose={() => setFolderPickerOpen(false)}
+            onPicked={(f) => setSelectedFolder(f)}
+          />
 
           {/* OpenAI Settings helper */}
           {typeof window !== 'undefined' && !localStorage.getItem('voiceloop_openai_key') && (

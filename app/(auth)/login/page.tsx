@@ -19,7 +19,17 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
-    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}` } })
+    const scopes = provider === 'google'
+      ? 'openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file'
+      : 'openid profile email'
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}`,
+        scopes,
+        queryParams: { prompt: 'consent select_account', access_type: 'offline' }
+      }
+    })
     if (error) setMessage(error.message)
     setLoading(false)
   }
