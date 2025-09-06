@@ -66,20 +66,28 @@ export function Navigation({
             <ThemeToggle />
             
             {userId ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="font-montserrat-light bg-transparent"
-                onClick={async () => {
-                  try {
-                    const supabase = getSupabaseBrowser()
-                    await supabase?.auth.signOut()
-                    setUserId(null)
-                  } catch {}
-                }}
-              >
-                Sign out
-              </Button>
+              <>
+                <Button variant="outline" size="sm" className="font-montserrat-light bg-transparent" asChild>
+                  <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-montserrat-light bg-transparent"
+                  onClick={async () => {
+                    try {
+                      const supabase = getSupabaseBrowser()
+                      await supabase?.auth.signOut()
+                      setUserId(null)
+                    } catch {}
+                  }}
+                >
+                  Sign out
+                </Button>
+              </>
             ) : (
               <Button variant="outline" size="sm" className="font-montserrat-light bg-transparent" asChild>
                 <Link href="/settings">
