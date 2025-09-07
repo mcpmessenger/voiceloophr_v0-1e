@@ -28,6 +28,7 @@ import {
 import GuestModeIndicator from "@/components/guest-mode-indicator"
 import { LogoLoader } from "@/components/logo-loader"
 import { Navigation } from "@/components/navigation"
+import { MiniCalendar } from "@/components/mini-calendar"
 
 interface Document {
   id: string
@@ -655,23 +656,29 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Recent Activity */}
+          {/* Right Sidebar */}
           <div className="space-y-6">
-            <h2 className="text-xl font-light text-foreground">Recent Activity</h2>
+            {/* Mini Calendar */}
+            <MiniCalendar className="border-thin" />
+            
+            {/* Recent Activity */}
+            <div>
+              <h2 className="text-xl font-light text-foreground mb-4">Recent Activity</h2>
 
-            <Card className="p-6 border-thin">
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-0.5">{getActivityIcon(activity.type)}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-light text-foreground">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground font-light">{formatDate(activity.timestamp)}</p>
+              <Card className="p-6 border-thin">
+                <div className="space-y-4">
+                  {recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">{getActivityIcon(activity.type)}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-light text-foreground">{activity.description}</p>
+                        <p className="text-xs text-muted-foreground font-light">{formatDate(activity.timestamp)}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
+                  ))}
+                </div>
+              </Card>
+            </div>
 
             {/* Usage Insights */}
             <Card className="p-6 border-thin">
