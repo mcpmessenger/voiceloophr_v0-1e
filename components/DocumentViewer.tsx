@@ -27,6 +27,7 @@ import {
   Music, 
   Video as VideoIcon
 } from "lucide-react"
+import { CalendarIntegration } from "./calendar-integration"
 // Removed modal viewer usage to simplify UX; in-tab viewer is used
 import dynamic from 'next/dynamic'
 
@@ -229,7 +230,7 @@ export function DocumentViewer({
       {/* Document Content Tabs */}
       <Card className="border-2 border-primary/20">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-primary/5 border-b border-primary/20">
+          <TabsList className="grid w-full grid-cols-6 bg-primary/5 border-b border-primary/20">
             <TabsTrigger value="summary" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="mr-2 h-4 w-4" />
               Summary
@@ -247,6 +248,10 @@ export function DocumentViewer({
             <TabsTrigger value="viewer" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="mr-2 h-4 w-4" />
               Document Viewer
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Calendar className="mr-2 h-4 w-4" />
+              Calendar
             </TabsTrigger>
             <TabsTrigger value="metadata" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Search className="mr-2 h-4 w-4" />
@@ -377,6 +382,15 @@ export function DocumentViewer({
                 />
               </div>
             </div>
+          </TabsContent>
+
+          {/* Calendar Tab */}
+          <TabsContent value="calendar" className="p-6">
+            <CalendarIntegration 
+              documentId={document.id}
+              documentTitle={document.name}
+              documentContent={document.extractedText}
+            />
           </TabsContent>
 
           {/* Metadata Tab */}
