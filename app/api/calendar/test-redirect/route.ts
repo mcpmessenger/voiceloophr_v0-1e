@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const redirectUri = process.env.GOOGLE_CALENDAR_REDIRECT_URI || 
-                       'https://v0-voice-loop-hr-platform.vercel.app/api/calendar/auth/google'
+    // Always derive from current request origin for accuracy in local vs prod
+    const origin = request.nextUrl.origin
+    const redirectUri = `${origin}/api/calendar/auth/google`
     
     return NextResponse.json({
       success: true,
       redirectUri,
-      appUrl: process.env.NEXT_PUBLIC_APP_URL,
+      appUrl: origin,
       message: 'Current redirect URI configuration'
     })
   } catch (error) {
