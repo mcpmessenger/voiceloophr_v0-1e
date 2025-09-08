@@ -36,9 +36,18 @@ export const metadata: Metadata = {
     "Transform your documents into searchable, conversational knowledge with AI-powered summaries and voice capabilities.",
   generator: "v0.app",
   icons: {
-    icon: "/images/voiceloop-logo.png",
-    shortcut: "/images/voiceloop-logo.png",
-    apple: "/images/voiceloop-logo.png",
+    icon: [
+      { url: "/images/voiceloop-logo.png", media: "(prefers-color-scheme: dark)" },
+      { url: "https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png", media: "(prefers-color-scheme: light)" },
+    ],
+    shortcut: [
+      { url: "/images/voiceloop-logo.png", media: "(prefers-color-scheme: dark)" },
+      { url: "https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png", media: "(prefers-color-scheme: light)" },
+    ],
+    apple: [
+      { url: "/images/voiceloop-logo.png", media: "(prefers-color-scheme: dark)" },
+      { url: "https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png", media: "(prefers-color-scheme: light)" },
+    ],
   },
 }
 

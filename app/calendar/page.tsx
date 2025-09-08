@@ -46,6 +46,15 @@ export default function CalendarPage() {
   const [refreshToken, setRefreshToken] = useState<string | null>(null)
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [eventsByDate, setEventsByDate] = useState<Record<string, CalendarEvent[]>>({})
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [editForm, setEditForm] = useState({
+    title: '',
+    startTime: '',
+    endTime: '',
+    location: '',
+    description: ''
+  })
 
   // Form state for scheduling
   const [scheduleForm, setScheduleForm] = useState({
@@ -154,6 +163,75 @@ export default function CalendarPage() {
     return days
   }
 
+  const openDayView = (day: Date) => {
+    setSelectedDate(day)
+  }
+
+  const closeDayView = () => {
+    setSelectedDate(null)
+    setEditingEvent(null)
+  }
+
+  const beginEditEvent = (event: CalendarEvent) => {
+    setEditingEvent(event)
+    setEditForm({
+      title: event.title || '',
+      startTime: event.startTime ? new Date(event.startTime).toISOString().slice(0,16) : '',
+      endTime: event.endTime ? new Date(event.endTime).toISOString().slice(0,16) : '',
+      location: event.location || '',
+      description: event.description || ''
+    })
+  }
+
+  const saveEditEvent = async () => {
+    if (!editingEvent) return
+    try {
+      const payload: any = { action: 'update-event', eventId: editingEvent.id, updates: {} }
+      if (editForm.title) payload.updates.title = editForm.title
+      if (editForm.location) payload.updates.location = editForm.location
+      if (editForm.description) payload.updates.description = editForm.description
+      if (editForm.startTime) payload.updates.startTime = new Date(editForm.startTime).toISOString()
+      if (editForm.endTime) payload.updates.endTime = new Date(editForm.endTime).toISOString()
+      payload.accessToken = accessToken
+      payload.refreshToken = refreshToken
+
+      const res = await fetch('/api/calendar/real', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const data = await res.json()
+      if (data.success) {
+        setError('✅ Event updated')
+        setEditingEvent(null)
+        loadMonthEvents(currentMonth)
+      } else {
+        setError(`❌ Update failed: ${data.error}`)
+      }
+    } catch (e) {
+      setError('❌ Update failed')
+    }
+  }
+
+  const deleteEvent = async (eventId: string) => {
+    try {
+      const res = await fetch('/api/calendar/real', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel-event', eventId, accessToken, refreshToken })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setError('✅ Event cancelled')
+        loadMonthEvents(currentMonth)
+      } else {
+        setError(`❌ Cancel failed: ${data.error}`)
+      }
+    } catch {
+      setError('❌ Cancel failed')
+    }
+  }
+
   const loadMonthEvents = async (month: Date) => {
     if (!accessToken) return
     const start = startOfWeek(startOfMonth(month)).toISOString()
@@ -179,6 +257,22 @@ export default function CalendarPage() {
           map[key] = map[key] || []
           map[key].push(ev)
         }
+        // Fetch holidays overlay
+        try {
+          const hres = await fetch('/api/calendar/real', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'get-holidays-range', start, end, accessToken, refreshToken })
+          })
+          const hdata = await hres.json()
+          if (hdata.success && Array.isArray(hdata.events)) {
+            for (const ev of hdata.events as CalendarEvent[]) {
+              const key = new Date(ev.startTime).toISOString().slice(0, 10)
+              map[key] = map[key] || []
+              map[key].push({ ...ev, status: 'confirmed' })
+            }
+          }
+        } catch {}
         setEventsByDate(map)
       }
     } catch (_) {}
@@ -521,7 +615,7 @@ export default function CalendarPage() {
                 const key = day.toISOString().slice(0,10)
                 const dayEvents = eventsByDate[key] || []
                 return (
-                  <div key={`${key}-${idx}`} className={`border rounded-md p-2 h-28 overflow-hidden ${inMonth ? '' : 'opacity-50'}`}>
+                  <div key={`${key}-${idx}`} className={`border rounded-md p-2 h-28 overflow-hidden ${inMonth ? '' : 'opacity-50'} cursor-pointer hover:bg-muted/40`} onClick={() => openDayView(day)}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-medium">{day.getDate()}</span>
                       {dayEvents.length > 0 && (
@@ -529,11 +623,15 @@ export default function CalendarPage() {
                       )}
                     </div>
                     <div className="space-y-1">
-                      {dayEvents.slice(0,3).map(ev => (
-                        <div key={ev.id} className="truncate text-xs">
-                          • {ev.title}
-                        </div>
-                      ))}
+                      {dayEvents.slice(0,3).map(ev => {
+                        const isAllDay = !String(ev.startTime).includes('T') || String(ev.id).startsWith('holiday_')
+                        return (
+                          <div key={ev.id} className="truncate text-xs">
+                            • {isAllDay ? '' : `${formatTime(ev.startTime)} `}{ev.title}
+                            {ev.location ? ` @ ${ev.location}` : ''}
+                          </div>
+                        )
+                      })}
                       {dayEvents.length > 3 && (
                         <div className="text-[10px] text-muted-foreground">+{dayEvents.length - 3} more</div>
                       )}
@@ -729,7 +827,7 @@ export default function CalendarPage() {
         {/* Auth Modal */}
         {showAuthModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="bg-card text-foreground rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto shadow-xl">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold">Connect Calendar</h2>
                 <Button 
@@ -742,6 +840,64 @@ export default function CalendarPage() {
               </div>
               
               <GoogleAccountSelector onProviderConnected={handleProviderConnected} />
+            </div>
+          </div>
+        )}
+
+        {/* Day View Modal */}
+        {selectedDate && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-card text-foreground rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[85vh] overflow-y-auto shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">{selectedDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
+                <Button variant="outline" size="sm" onClick={closeDayView}>×</Button>
+              </div>
+              {(() => {
+                const key = selectedDate.toISOString().slice(0,10)
+                const list = eventsByDate[key] || []
+                if (list.length === 0) return (<div className="text-sm text-muted-foreground">No events</div>)
+                return (
+                  <div className="space-y-3">
+                    {list.map(ev => (
+                      <Card key={ev.id} className="p-3">
+                        {editingEvent?.id === ev.id ? (
+                          <div className="space-y-2">
+                            <input className="w-full border border-border bg-background text-foreground px-2 py-1 rounded" value={editForm.title} onChange={e=>setEditForm(s=>({...s,title:e.target.value}))} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              <input type="datetime-local" className="w-full border border-border bg-background text-foreground px-2 py-1 rounded" value={editForm.startTime} onChange={e=>setEditForm(s=>({...s,startTime:e.target.value}))} />
+                              <input type="datetime-local" className="w-full border border-border bg-background text-foreground px-2 py-1 rounded" value={editForm.endTime} onChange={e=>setEditForm(s=>({...s,endTime:e.target.value}))} />
+                            </div>
+                            <input className="w-full border border-border bg-background text-foreground px-2 py-1 rounded" placeholder="Location" value={editForm.location} onChange={e=>setEditForm(s=>({...s,location:e.target.value}))} />
+                            <textarea className="w-full border border-border bg-background text-foreground px-2 py-1 rounded" placeholder="Description" value={editForm.description} onChange={e=>setEditForm(s=>({...s,description:e.target.value}))} />
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={saveEditEvent}>Save</Button>
+                              <Button size="sm" variant="outline" onClick={()=>setEditingEvent(null)}>Cancel</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-medium text-sm">{ev.title}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {String(ev.id).startsWith('holiday_') ? 'All day' : `${formatTime(ev.startTime)} - ${formatTime(ev.endTime)}`}
+                                {ev.location ? ` • ${ev.location}` : ''}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              {!String(ev.id).startsWith('holiday_') && (
+                                <Button size="sm" variant="outline" onClick={()=>beginEditEvent(ev)}>Edit</Button>
+                              )}
+                              {!String(ev.id).startsWith('holiday_') && (
+                                <Button size="sm" variant="destructive" onClick={()=>deleteEvent(ev.id)}>Delete</Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           </div>
         )}

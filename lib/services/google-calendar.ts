@@ -169,6 +169,39 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Get public holidays for a given region within a date range
+   * Uses Google public holiday calendars (e.g., en.usa#holiday@group.v.calendar.google.com)
+   */
+  async getHolidaysInRange(calendarId: string, startISO: string, endISO: string): Promise<GoogleCalendarEvent[]> {
+    try {
+      const response = await this.calendar.events.list({
+        calendarId,
+        timeMin: startISO,
+        timeMax: endISO,
+        singleEvents: true,
+        orderBy: 'startTime'
+      })
+
+      const events = response.data.items || []
+      return events.map((event: any) => ({
+        id: `holiday_${event.id}`,
+        title: event.summary || 'Holiday',
+        description: event.description || '',
+        startTime: event.start?.dateTime || event.start?.date || '',
+        endTime: event.end?.dateTime || event.end?.date || '',
+        attendees: [],
+        location: event.location || '',
+        status: 'confirmed',
+        created: event.created || new Date().toISOString(),
+        updated: event.updated || new Date().toISOString()
+      }))
+    } catch (error) {
+      console.error('Failed to get holidays:', error)
+      return []
+    }
+  }
+
+  /**
    * Schedule a new meeting
    */
   async scheduleMeeting(

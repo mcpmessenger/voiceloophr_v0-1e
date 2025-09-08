@@ -53,6 +53,15 @@ export async function POST(request: NextRequest) {
           message: `Found ${rangeEvents.length} events in range`
         })
 
+      case 'get-holidays-range':
+        if (!params.start || !params.end) {
+          return NextResponse.json({ success: false, error: 'start and end (ISO) are required' }, { status: 400 })
+        }
+        // Default to US holidays if not specified
+        const holidayCalendar = params.calendarId || 'en.usa#holiday@group.v.calendar.google.com'
+        const holidays = await googleService.getHolidaysInRange(holidayCalendar, params.start, params.end)
+        return NextResponse.json({ success: true, events: holidays, message: `Found ${holidays.length} holidays` })
+
       case 'schedule-meeting':
         if (!params.accessToken) {
           return NextResponse.json({
@@ -87,6 +96,24 @@ export async function POST(request: NextRequest) {
           authUrl,
           message: 'Google Calendar OAuth URL generated'
         })
+
+      case 'update-event':
+        try {
+          const updated = await googleService.updateEvent(params.eventId, params.updates || {})
+          return NextResponse.json({ success: true, event: updated })
+        } catch (e: any) {
+          const apiMsg = e?.response?.data?.error?.message || e?.message || 'Failed to update event'
+          return NextResponse.json({ success: false, error: apiMsg }, { status: 400 })
+        }
+
+      case 'cancel-event':
+        try {
+          const ok = await googleService.cancelEvent(params.eventId)
+          return NextResponse.json({ success: ok })
+        } catch (e: any) {
+          const apiMsg = e?.response?.data?.error?.message || e?.message || 'Failed to cancel event'
+          return NextResponse.json({ success: false, error: apiMsg }, { status: 400 })
+        }
 
       default:
         return NextResponse.json({ 

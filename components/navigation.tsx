@@ -47,13 +47,26 @@ export function Navigation({
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <Image 
-              src="/images/voiceloop-logo.png" 
-              alt="VoiceLoop" 
-              width={56} 
-              height={56} 
-              className="rounded-lg" 
-            />
+            <div className="block dark:hidden">
+              <Image 
+                src="https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png" 
+                alt="VoiceLoop" 
+                width={56} 
+                height={56} 
+                className="rounded-lg" 
+                priority
+              />
+            </div>
+            <div className="hidden dark:block">
+              <Image 
+                src="/images/voiceloop-logo.png" 
+                alt="VoiceLoop" 
+                width={56} 
+                height={56} 
+                className="rounded-lg" 
+                priority
+              />
+            </div>
           </Link>
           
           <div className="flex items-center gap-2">
