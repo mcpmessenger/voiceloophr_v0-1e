@@ -68,13 +68,24 @@ export default function HomePage() {
       <section className="py-20 px-6">
         <div className="container mx-auto max-w-4xl text-center">
           <div className="mb-8">
-            <Image
-              src="/images/voiceloop-logo.png"
-              alt="VoiceLoop"
-              width={120}
-              height={120}
-              className="mx-auto mb-8 rounded-2xl"
-            />
+            <div className="block dark:hidden">
+              <Image
+                src="https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png"
+                alt="VoiceLoop"
+                width={120}
+                height={120}
+                className="mx-auto mb-8 rounded-2xl"
+              />
+            </div>
+            <div className="hidden dark:block">
+              <Image
+                src="/images/voiceloop-logo.png"
+                alt="VoiceLoop"
+                width={120}
+                height={120}
+                className="mx-auto mb-8 rounded-2xl"
+              />
+            </div>
           </div>
 
           <h1 className="text-5xl md:text-6xl font-montserrat-light text-foreground mb-6 text-balance">
@@ -120,7 +131,12 @@ export default function HomePage() {
       <footer className="border-t border-thin border-border/50 py-8 px-6">
         <div className="container mx-auto text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={24} height={24} className="rounded" />
+            <div className="block dark:hidden">
+              <Image src="https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png" alt="VoiceLoop" width={24} height={24} className="rounded" />
+            </div>
+            <div className="hidden dark:block">
+              <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={24} height={24} className="rounded" />
+            </div>
             <span className="text-sm font-montserrat-light text-muted-foreground">VoiceLoop HR - AI Document Processing</span>
           </div>
           <p className="text-sm text-muted-foreground font-montserrat-light">
