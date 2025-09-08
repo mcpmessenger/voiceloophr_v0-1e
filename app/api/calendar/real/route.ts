@@ -7,17 +7,20 @@ export async function POST(request: NextRequest) {
     const { action, ...params } = body
 
     // Check if we have Google Calendar credentials
-    if (!process.env.GOOGLE_OAUTH_CLIENT_ID || !process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
+    const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID
+    const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET || process.env.GOOGLE_OAUTH_CLIENT_SECRET
+    if (!clientId || !clientSecret) {
       return NextResponse.json({
         success: false,
         error: 'Google Calendar credentials not configured'
       }, { status: 500 })
     }
 
+    const origin = request.nextUrl.origin
     const googleService = new GoogleCalendarService({
-      clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      redirectUri: 'https://v0-voice-loop-hr-platform.vercel.app/api/calendar/auth/google',
+      clientId,
+      clientSecret,
+      redirectUri: process.env.GOOGLE_CALENDAR_REDIRECT_URI || `${origin}/api/calendar/auth/google`,
       accessToken: params.accessToken,
       refreshToken: params.refreshToken
     })
@@ -39,6 +42,17 @@ export async function POST(request: NextRequest) {
           message: `Found ${events.length} events`
         })
 
+      case 'get-events-range':
+        if (!params.start || !params.end) {
+          return NextResponse.json({ success: false, error: 'start and end (ISO) are required' }, { status: 400 })
+        }
+        const rangeEvents = await googleService.getEventsInRange(params.start, params.end)
+        return NextResponse.json({
+          success: true,
+          events: rangeEvents,
+          message: `Found ${rangeEvents.length} events in range`
+        })
+
       case 'schedule-meeting':
         if (!params.accessToken) {
           return NextResponse.json({
@@ -47,20 +61,24 @@ export async function POST(request: NextRequest) {
           }, { status: 401 })
         }
 
-        const event = await googleService.scheduleMeeting(
-          params.title,
-          params.startTime,
-          params.endTime,
-          params.attendees || [],
-          params.description,
-          params.location
-        )
-        
-        return NextResponse.json({
-          success: true,
-          event,
-          message: 'Meeting scheduled successfully in Google Calendar'
-        })
+        try {
+          const event = await googleService.scheduleMeeting(
+            params.title,
+            params.startTime,
+            params.endTime,
+            params.attendees || [],
+            params.description,
+            params.location
+          )
+          return NextResponse.json({
+            success: true,
+            event,
+            message: 'Meeting scheduled successfully in Google Calendar'
+          })
+        } catch (e: any) {
+          const apiMsg = e?.response?.data?.error?.message || e?.message || 'Failed to schedule meeting'
+          return NextResponse.json({ success: false, error: apiMsg }, { status: 400 })
+        }
 
       case 'get-auth-url':
         const authUrl = googleService.getAuthUrl(true)

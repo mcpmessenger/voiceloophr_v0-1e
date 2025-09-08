@@ -14,7 +14,7 @@ import {
   Plus,
   MoreHorizontal
 } from "lucide-react"
-import { CalendarServiceBrowser } from "@/lib/services/calendar-browser"
+// Dashboard mini-calendar now reads tokens directly and uses the real calendar API
 
 interface CalendarEvent {
   id: string
@@ -37,40 +37,57 @@ export function MiniCalendar({
   showUpcoming = true, 
   maxEvents = 3 
 }: MiniCalendarProps) {
-  const [calendarService] = useState(() => new CalendarServiceBrowser())
   const [isConnected, setIsConnected] = useState(false)
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [refreshToken, setRefreshToken] = useState<string | null>(null)
 
   useEffect(() => {
     checkConnection()
+  }, [])
+
+  useEffect(() => {
     if (showUpcoming) {
       loadUpcomingEvents()
     }
-  }, [showUpcoming])
+  }, [showUpcoming, isConnected, accessToken])
 
   const checkConnection = async () => {
     try {
-      const connected = await calendarService.testConnection()
-      setIsConnected(connected)
+      const stored = localStorage.getItem('google_calendar_tokens')
+      if (stored) {
+        const tokens = JSON.parse(stored)
+        setAccessToken(tokens.access_token || null)
+        setRefreshToken(tokens.refresh_token || null)
+        setIsConnected(Boolean(tokens.access_token))
+      } else {
+        setIsConnected(false)
+      }
     } catch (error) {
-      console.error('Calendar connection check failed:', error)
       setIsConnected(false)
     }
   }
 
   const loadUpcomingEvents = async () => {
-    if (!isConnected) return
+    if (!isConnected || !accessToken) return
 
     setIsLoading(true)
     setError(null)
 
     try {
-      const result = await calendarService.getUpcomingEvents(7) // Next 7 days
-      if (result.success && result.events) {
+      const res = await fetch('/api/calendar/real', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-events', days: 7, accessToken, refreshToken })
+      })
+      const result = await res.json()
+      if (result.success && Array.isArray(result.events)) {
         setUpcomingEvents(result.events.slice(0, maxEvents))
+      } else if (!result.success && result.error) {
+        setError(result.error)
       }
     } catch (error) {
       console.error('Failed to load upcoming events:', error)
@@ -129,7 +146,11 @@ export function MiniCalendar({
           className="mt-3 w-full" 
           variant="outline" 
           size="sm"
-          onClick={checkConnection}
+          onClick={() => {
+            checkConnection();
+            // Navigate to /calendar for full connect flow
+            window.location.href = '/calendar'
+          }}
           disabled={isLoading}
         >
           {isLoading ? (

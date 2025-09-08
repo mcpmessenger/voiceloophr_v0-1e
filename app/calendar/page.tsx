@@ -14,7 +14,9 @@ import {
   RefreshCw,
   ExternalLink,
   CheckCircle,
-  XCircle
+  XCircle,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { GoogleAccountSelector } from "@/components/google-account-selector"
@@ -42,6 +44,8 @@ export default function CalendarPage() {
   const [connectedProviders, setConnectedProviders] = useState<any[]>([])
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState<string | null>(null)
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
+  const [eventsByDate, setEventsByDate] = useState<Record<string, CalendarEvent[]>>({})
 
   // Form state for scheduling
   const [scheduleForm, setScheduleForm] = useState({
@@ -63,17 +67,38 @@ export default function CalendarPage() {
         setAccessToken(tokens.access_token)
         setRefreshToken(tokens.refresh_token)
         setIsConnected(true)
-        setConnectedProviders([{
-          id: 'google',
-          name: 'Google Calendar',
-          type: 'google',
-          status: 'connected'
-        }])
+        setConnectedProviders(prev => {
+          const map = new Map<string, any>()
+          ;[...prev, { id: 'google', name: 'Google Calendar', type: 'google', status: 'connected' }].forEach(p => map.set(p.id, p))
+          return Array.from(map.values())
+        })
         loadRealEvents()
+        loadMonthEvents(currentMonth)
       } catch (error) {
         console.error('Failed to parse stored tokens:', error)
       }
     }
+
+    // Listen for tokens arriving from OAuth popup (storage event)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'google_calendar_tokens' && e.newValue) {
+        try {
+          const tokens = JSON.parse(e.newValue)
+          setAccessToken(tokens.access_token)
+          setRefreshToken(tokens.refresh_token)
+          setIsConnected(true)
+          setConnectedProviders(prev => {
+            const map = new Map<string, any>()
+            ;[...prev, { id: 'google', name: 'Google Calendar', type: 'google', status: 'connected' }].forEach(p => map.set(p.id, p))
+            return Array.from(map.values())
+          })
+          setShowAuthModal(false)
+          loadMonthEvents(currentMonth)
+        } catch {}
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   const checkConnection = async () => {
@@ -85,19 +110,87 @@ export default function CalendarPage() {
       })
       
       const data = await response.json()
-      
+
+      // Do not mark connected here; connection depends on presence of tokens
       if (data.success) {
-        setConnectedProviders([{
-          id: 'google',
-          name: 'Google Calendar',
-          type: 'google',
-          status: 'connected'
-        }])
+        // keep provider label if already connected
+        if (accessToken) {
+          setConnectedProviders([{ id: 'google', name: 'Google Calendar', type: 'google', status: 'connected' }])
+          loadMonthEvents(currentMonth)
+        }
       }
     } catch (error) {
       console.error('Calendar connection check failed:', error)
     }
   }
+
+  // Helpers for month grid
+  const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1)
+  const endOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0)
+  const startOfWeek = (date: Date) => {
+    const d = new Date(date)
+    const day = d.getDay() // 0 Sun - 6 Sat
+    d.setDate(d.getDate() - day)
+    d.setHours(0, 0, 0, 0)
+    return d
+  }
+  const endOfWeek = (date: Date) => {
+    const d = new Date(date)
+    const day = d.getDay()
+    d.setDate(d.getDate() + (6 - day))
+    d.setHours(23, 59, 59, 999)
+    return d
+  }
+
+  const getMonthGridDays = (month: Date): Date[] => {
+    const start = startOfWeek(startOfMonth(month))
+    const end = endOfWeek(endOfMonth(month))
+    const days: Date[] = []
+    const cursor = new Date(start)
+    while (cursor <= end) {
+      days.push(new Date(cursor))
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    return days
+  }
+
+  const loadMonthEvents = async (month: Date) => {
+    if (!accessToken) return
+    const start = startOfWeek(startOfMonth(month)).toISOString()
+    const end = endOfWeek(endOfMonth(month)).toISOString()
+
+    try {
+      const response = await fetch('/api/calendar/real', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-events-range',
+          start,
+          end,
+          accessToken,
+          refreshToken
+        })
+      })
+      const data = await response.json()
+      if (data.success && Array.isArray(data.events)) {
+        const map: Record<string, CalendarEvent[]> = {}
+        for (const ev of data.events as CalendarEvent[]) {
+          const key = new Date(ev.startTime).toISOString().slice(0, 10)
+          map[key] = map[key] || []
+          map[key].push(ev)
+        }
+        setEventsByDate(map)
+      }
+    } catch (_) {}
+  }
+
+  // Load month events on connection or when month changes
+  useEffect(() => {
+    if (isConnected && accessToken) {
+      loadMonthEvents(currentMonth)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, accessToken, currentMonth])
 
   const loadRealEvents = async () => {
     if (!accessToken) return
@@ -133,7 +226,11 @@ export default function CalendarPage() {
   }
 
   const handleProviderConnected = (provider: any) => {
-    setConnectedProviders(prev => [...prev, provider])
+    setConnectedProviders(prev => {
+      const map = new Map<string, any>()
+      ;[...prev, provider].forEach(p => map.set(p.id, p))
+      return Array.from(map.values())
+    })
     setIsConnected(true)
     setShowAuthModal(false)
     setError(null)
@@ -192,14 +289,16 @@ export default function CalendarPage() {
         .map(email => email.trim())
         .filter(email => email)
 
+      const toISO = (v: string) => new Date(v).toISOString()
+
       const response = await fetch('/api/calendar/real', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'schedule-meeting',
           title: scheduleForm.title,
-          startTime: scheduleForm.startTime,
-          endTime: scheduleForm.endTime,
+          startTime: toISO(scheduleForm.startTime),
+          endTime: toISO(scheduleForm.endTime),
           attendees,
           description: scheduleForm.description,
           location: scheduleForm.location,
@@ -224,14 +323,27 @@ export default function CalendarPage() {
         // Refresh events
         loadRealEvents()
       } else {
-        setError(`❌ Failed to schedule meeting: ${data.error}`)
+        setError(`❌ Failed to schedule meeting: ${data.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Failed to schedule meeting:', error)
-      setError(`❌ Failed to schedule meeting: ${error}`)
+      setError(`❌ Failed to schedule meeting: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleDisconnect = () => {
+    try {
+      localStorage.removeItem('google_calendar_tokens')
+    } catch {}
+    setAccessToken(null)
+    setRefreshToken(null)
+    setIsConnected(false)
+    setConnectedProviders([])
+    setEvents([])
+    setEventsByDate({})
+    setError('Disconnected from Google Calendar')
   }
 
   const formatDateTime = (dateTime: string) => {
@@ -280,12 +392,31 @@ export default function CalendarPage() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={checkConnection}
+              onClick={() => { checkConnection(); if (isConnected && accessToken) { loadMonthEvents(currentMonth) } }}
               disabled={isLoading}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
+            {!isConnected ? (
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAuthModal(true)}
+                disabled={isLoading}
+              >
+                Connect
+              </Button>
+            ) : (
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={handleDisconnect}
+                disabled={isLoading}
+              >
+                Disconnect
+              </Button>
+            )}
             <Button 
               onClick={() => setShowScheduleForm(!showScheduleForm)}
               disabled={!isConnected}
@@ -332,7 +463,7 @@ export default function CalendarPage() {
             {accessToken && (
               <Button 
                 variant="outline"
-                onClick={loadRealEvents}
+                onClick={() => { loadRealEvents(); loadMonthEvents(currentMonth) }}
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -340,7 +471,7 @@ export default function CalendarPage() {
                 ) : (
                   <RefreshCw className="h-4 w-4 mr-2" />
                 )}
-                Load Real Events
+                Reload Month
               </Button>
             )}
             </div>
@@ -352,12 +483,64 @@ export default function CalendarPage() {
           <Card className="p-4 mb-6">
             <h3 className="font-medium mb-2">Connected Providers</h3>
             <div className="flex gap-2">
-              {connectedProviders.map((provider) => (
-                <div key={provider.id} className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+              {connectedProviders.map((provider, idx) => (
+                <div key={`${provider.id}-${idx}`} className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
                   <CheckCircle className="h-3 w-3" />
                   {provider.name}
                 </div>
               ))}
+            </div>
+          </Card>
+        )}
+
+        {/* Month View */}
+        {isConnected && (
+          <Card className="p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="text-lg font-medium">
+                  {currentMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 text-xs text-muted-foreground mb-2">
+              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                <div key={d} className="text-center">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {getMonthGridDays(currentMonth).map((day, idx) => {
+                const inMonth = day.getMonth() === currentMonth.getMonth()
+                const key = day.toISOString().slice(0,10)
+                const dayEvents = eventsByDate[key] || []
+                return (
+                  <div key={`${key}-${idx}`} className={`border rounded-md p-2 h-28 overflow-hidden ${inMonth ? '' : 'opacity-50'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium">{day.getDate()}</span>
+                      {dayEvents.length > 0 && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0">{dayEvents.length}</Badge>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      {dayEvents.slice(0,3).map(ev => (
+                        <div key={ev.id} className="truncate text-xs">
+                          • {ev.title}
+                        </div>
+                      ))}
+                      {dayEvents.length > 3 && (
+                        <div className="text-[10px] text-muted-foreground">+{dayEvents.length - 3} more</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </Card>
         )}

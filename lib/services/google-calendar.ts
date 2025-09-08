@@ -136,6 +136,39 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Get events within a date range
+   */
+  async getEventsInRange(startISO: string, endISO: string): Promise<GoogleCalendarEvent[]> {
+    try {
+      const response = await this.calendar.events.list({
+        calendarId: 'primary',
+        timeMin: startISO,
+        timeMax: endISO,
+        singleEvents: true,
+        orderBy: 'startTime'
+      })
+
+      const events = response.data.items || []
+      return events.map((event: any) => ({
+        id: event.id,
+        title: event.summary || 'No Title',
+        description: event.description || '',
+        startTime: event.start?.dateTime || event.start?.date || '',
+        endTime: event.end?.dateTime || event.end?.date || '',
+        attendees: event.attendees?.map((attendee: any) => attendee.email) || [],
+        location: event.location || '',
+        status: event.status === 'confirmed' ? 'confirmed' : 
+                event.status === 'tentative' ? 'tentative' : 'cancelled',
+        created: event.created || new Date().toISOString(),
+        updated: event.updated || new Date().toISOString()
+      }))
+    } catch (error) {
+      console.error('Failed to get events in range:', error)
+      throw new Error('Failed to fetch calendar events')
+    }
+  }
+
+  /**
    * Schedule a new meeting
    */
   async scheduleMeeting(
@@ -147,6 +180,8 @@ export class GoogleCalendarService {
     location?: string
   ): Promise<GoogleCalendarEvent> {
     try {
+      // Ensure auth has access token set
+      const creds = await this.oauth2Client.getAccessToken()
       const event = {
         summary: title,
         description: description || '',
