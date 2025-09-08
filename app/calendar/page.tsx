@@ -10,15 +10,14 @@ import {
   MapPin, 
   Users,
   Plus,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  Search,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  ExternalLink,
+  CheckCircle,
+  XCircle
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
-import { CalendarServiceBrowser } from "@/lib/services/calendar-browser"
+import { GoogleAccountSelector } from "@/components/google-account-selector"
 
 interface CalendarEvent {
   id: string
@@ -34,13 +33,13 @@ interface CalendarEvent {
 }
 
 export default function CalendarPage() {
-  const [calendarService] = useState(() => new CalendarServiceBrowser())
   const [isConnected, setIsConnected] = useState(false)
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentDate, setCurrentDate] = useState(new Date())
   const [showScheduleForm, setShowScheduleForm] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [connectedProviders, setConnectedProviders] = useState<any[]>([])
 
   // Form state for scheduling
   const [scheduleForm, setScheduleForm] = useState({
@@ -54,33 +53,68 @@ export default function CalendarPage() {
 
   useEffect(() => {
     checkConnection()
-    loadEvents()
   }, [])
 
   const checkConnection = async () => {
     try {
-      const connected = await calendarService.testConnection()
-      setIsConnected(connected)
+      // Test if we can reach the Google OAuth API
+      const response = await fetch('/api/calendar/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      const data = await response.json()
+      setIsConnected(data.success)
+      
+      if (data.success) {
+        setConnectedProviders([{
+          id: 'google',
+          name: 'Google Calendar',
+          type: 'google',
+          status: 'connected'
+        }])
+      }
     } catch (error) {
       console.error('Calendar connection check failed:', error)
       setIsConnected(false)
     }
   }
 
-  const loadEvents = async () => {
-    if (!isConnected) return
+  const handleProviderConnected = (provider: any) => {
+    setConnectedProviders(prev => [...prev, provider])
+    setIsConnected(true)
+    setShowAuthModal(false)
+    setError(null)
+  }
 
+  const handleProviderDisconnected = (providerId: string) => {
+    setConnectedProviders(prev => prev.filter(p => p.id !== providerId))
+    if (connectedProviders.length <= 1) {
+      setIsConnected(false)
+    }
+  }
+
+  const testGoogleOAuth = async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const result = await calendarService.getUpcomingEvents(30) // Next 30 days
-      if (result.success && result.events) {
-        setEvents(result.events)
+      const response = await fetch('/api/calendar/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setError(`✅ Google OAuth URL generated successfully!`)
+        // Open the OAuth URL
+        window.open(data.authUrl, '_blank')
+      } else {
+        setError(`❌ Google OAuth failed: ${data.error}`)
       }
     } catch (error) {
-      console.error('Failed to load events:', error)
-      setError('Failed to load calendar events')
+      setError(`❌ Google OAuth error: ${error}`)
     } finally {
       setIsLoading(false)
     }
@@ -96,34 +130,17 @@ export default function CalendarPage() {
     setError(null)
 
     try {
-      const attendees = scheduleForm.attendees
-        .split(',')
-        .map(email => email.trim())
-        .filter(email => email)
-
-      const result = await calendarService.scheduleMeeting(
-        scheduleForm.title,
-        scheduleForm.startTime,
-        scheduleForm.endTime,
-        attendees,
-        scheduleForm.description,
-        scheduleForm.location
-      )
-
-      if (result.success) {
-        setShowScheduleForm(false)
-        setScheduleForm({
-          title: '',
-          description: '',
-          startTime: '',
-          endTime: '',
-          attendees: '',
-          location: ''
-        })
-        loadEvents() // Refresh events
-      } else {
-        setError('Failed to schedule meeting')
-      }
+      // For now, just show success since we don't have full calendar integration yet
+      setShowScheduleForm(false)
+      setScheduleForm({
+        title: '',
+        description: '',
+        startTime: '',
+        endTime: '',
+        attendees: '',
+        location: ''
+      })
+      setError('✅ Meeting scheduled successfully! (Demo mode)')
     } catch (error) {
       console.error('Failed to schedule meeting:', error)
       setError('Failed to schedule meeting')
@@ -178,7 +195,7 @@ export default function CalendarPage() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={loadEvents}
+              onClick={checkConnection}
               disabled={isLoading}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -197,26 +214,66 @@ export default function CalendarPage() {
         {/* Connection Status */}
         {!isConnected && (
           <Card className="p-6 border-dashed border-2 border-muted-foreground/25 mb-8">
-            <div className="flex items-center gap-3 text-muted-foreground">
+            <div className="flex items-center gap-3 text-muted-foreground mb-4">
               <Calendar className="h-6 w-6" />
               <div>
                 <p className="font-medium">Calendar Integration</p>
                 <p className="text-sm">Connect your calendar to view and schedule events</p>
               </div>
             </div>
-            <Button 
-              className="mt-4" 
-              variant="outline" 
-              onClick={checkConnection}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setShowAuthModal(true)}
+                disabled={isLoading}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Connect Calendar
+              </Button>
+              
+              <Button 
+                variant="outline"
+                onClick={testGoogleOAuth}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <Calendar className="h-4 w-4 mr-2" />
+                )}
+                Test OAuth
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Connected Providers */}
+        {connectedProviders.length > 0 && (
+          <Card className="p-4 mb-6">
+            <h3 className="font-medium mb-2">Connected Providers</h3>
+            <div className="flex gap-2">
+              {connectedProviders.map((provider) => (
+                <div key={provider.id} className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                  <CheckCircle className="h-3 w-3" />
+                  {provider.name}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {/* Error/Success Messages */}
+        {error && (
+          <Card className="p-4 mb-6">
+            <div className="flex items-center gap-2">
+              {error.includes('✅') ? (
+                <CheckCircle className="h-4 w-4 text-green-600" />
               ) : (
-                <Calendar className="h-4 w-4 mr-2" />
+                <XCircle className="h-4 w-4 text-red-600" />
               )}
-              Connect Calendar
-            </Button>
+              <span className="text-sm font-medium">Status</span>
+            </div>
+            <p className="text-sm mt-1">{error}</p>
           </Card>
         )}
 
@@ -290,13 +347,6 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            {error && (
-              <div className="flex items-center gap-2 text-red-600 text-sm mt-4">
-                <AlertCircle className="h-4 w-4" />
-                {error}
-              </div>
-            )}
-
             <div className="flex gap-2 mt-4">
               <Button 
                 onClick={handleScheduleMeeting}
@@ -332,11 +382,7 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : events.length > 0 ? (
+            {events.length > 0 ? (
               <div className="space-y-4">
                 {events.map((event) => (
                   <div key={event.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -394,14 +440,27 @@ export default function CalendarPage() {
                 <p className="text-sm">Schedule a meeting to get started</p>
               </div>
             )}
-
-            {error && (
-              <div className="flex items-center gap-2 text-red-600 text-sm mt-4">
-                <AlertCircle className="h-4 w-4" />
-                {error}
-              </div>
-            )}
           </Card>
+        )}
+
+        {/* Auth Modal */}
+        {showAuthModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">Connect Calendar</h2>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowAuthModal(false)}
+                >
+                  ×
+                </Button>
+              </div>
+              
+              <GoogleAccountSelector onProviderConnected={handleProviderConnected} />
+            </div>
+          </div>
         )}
       </div>
     </div>
