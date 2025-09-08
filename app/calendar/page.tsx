@@ -40,6 +40,8 @@ export default function CalendarPage() {
   const [showScheduleForm, setShowScheduleForm] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [connectedProviders, setConnectedProviders] = useState<any[]>([])
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [refreshToken, setRefreshToken] = useState<string | null>(null)
 
   // Form state for scheduling
   const [scheduleForm, setScheduleForm] = useState({
@@ -53,6 +55,25 @@ export default function CalendarPage() {
 
   useEffect(() => {
     checkConnection()
+    // Check for stored tokens
+    const storedTokens = localStorage.getItem('google_calendar_tokens')
+    if (storedTokens) {
+      try {
+        const tokens = JSON.parse(storedTokens)
+        setAccessToken(tokens.access_token)
+        setRefreshToken(tokens.refresh_token)
+        setIsConnected(true)
+        setConnectedProviders([{
+          id: 'google',
+          name: 'Google Calendar',
+          type: 'google',
+          status: 'connected'
+        }])
+        loadRealEvents()
+      } catch (error) {
+        console.error('Failed to parse stored tokens:', error)
+      }
+    }
   }, [])
 
   const checkConnection = async () => {
@@ -64,7 +85,6 @@ export default function CalendarPage() {
       })
       
       const data = await response.json()
-      setIsConnected(data.success)
       
       if (data.success) {
         setConnectedProviders([{
@@ -76,7 +96,39 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error('Calendar connection check failed:', error)
-      setIsConnected(false)
+    }
+  }
+
+  const loadRealEvents = async () => {
+    if (!accessToken) return
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/calendar/real', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-events',
+          accessToken,
+          refreshToken,
+          days: 30
+        })
+      })
+
+      const data = await response.json()
+      
+      if (data.success && data.events) {
+        setEvents(data.events)
+        setError(`✅ ${data.message}`)
+      } else {
+        setError(`❌ Failed to load events: ${data.error}`)
+      }
+    } catch (error) {
+      setError(`❌ Error loading events: ${error}`)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -126,24 +178,57 @@ export default function CalendarPage() {
       return
     }
 
+    if (!accessToken) {
+      setError('Please connect to Google Calendar first')
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
     try {
-      // For now, just show success since we don't have full calendar integration yet
-      setShowScheduleForm(false)
-      setScheduleForm({
-        title: '',
-        description: '',
-        startTime: '',
-        endTime: '',
-        attendees: '',
-        location: ''
+      const attendees = scheduleForm.attendees
+        .split(',')
+        .map(email => email.trim())
+        .filter(email => email)
+
+      const response = await fetch('/api/calendar/real', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'schedule-meeting',
+          title: scheduleForm.title,
+          startTime: scheduleForm.startTime,
+          endTime: scheduleForm.endTime,
+          attendees,
+          description: scheduleForm.description,
+          location: scheduleForm.location,
+          accessToken,
+          refreshToken
+        })
       })
-      setError('✅ Meeting scheduled successfully! (Demo mode)')
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setShowScheduleForm(false)
+        setScheduleForm({
+          title: '',
+          description: '',
+          startTime: '',
+          endTime: '',
+          attendees: '',
+          location: ''
+        })
+        setError(`✅ ${data.message}`)
+        // Refresh events
+        loadRealEvents()
+      } else {
+        setError(`❌ Failed to schedule meeting: ${data.error}`)
+      }
     } catch (error) {
       console.error('Failed to schedule meeting:', error)
-      setError('Failed to schedule meeting')
+      setError(`❌ Failed to schedule meeting: ${error}`)
     } finally {
       setIsLoading(false)
     }
@@ -231,18 +316,33 @@ export default function CalendarPage() {
                 Connect Calendar
               </Button>
               
+            <Button 
+              variant="outline"
+              onClick={testGoogleOAuth}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Calendar className="h-4 w-4 mr-2" />
+              )}
+              Test OAuth
+            </Button>
+            
+            {accessToken && (
               <Button 
                 variant="outline"
-                onClick={testGoogleOAuth}
+                onClick={loadRealEvents}
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 ) : (
-                  <Calendar className="h-4 w-4 mr-2" />
+                  <RefreshCw className="h-4 w-4 mr-2" />
                 )}
-                Test OAuth
+                Load Real Events
               </Button>
+            )}
             </div>
           </Card>
         )}

@@ -61,16 +61,23 @@ export function GoogleAccountSelector({ onProviderConnected }: GoogleAccountSele
         )
 
         // Listen for auth completion
-        const checkClosed = setInterval(() => {
+        const checkClosed = setInterval(async () => {
           if (popup?.closed) {
             clearInterval(checkClosed)
-            setSuccess('Google Calendar connected successfully!')
-            onProviderConnected({
-              id: 'google',
-              name: 'Google Calendar',
-              type: 'google',
-              status: 'connected'
-            })
+            
+            // Check if we have tokens in localStorage (set by OAuth callback)
+            const tokens = localStorage.getItem('google_calendar_tokens')
+            if (tokens) {
+              setSuccess('Google Calendar connected successfully!')
+              onProviderConnected({
+                id: 'google',
+                name: 'Google Calendar',
+                type: 'google',
+                status: 'connected'
+              })
+            } else {
+              setError('Authentication was cancelled or failed')
+            }
           }
         }, 1000)
       } else {
@@ -107,16 +114,23 @@ export function GoogleAccountSelector({ onProviderConnected }: GoogleAccountSele
         )
 
         // Listen for auth completion
-        const checkClosed = setInterval(() => {
+        const checkClosed = setInterval(async () => {
           if (popup?.closed) {
             clearInterval(checkClosed)
-            setSuccess('Google Calendar connected successfully!')
-            onProviderConnected({
-              id: 'google',
-              name: 'Google Calendar',
-              type: 'google',
-              status: 'connected'
-            })
+            
+            // Check if we have tokens in localStorage (set by OAuth callback)
+            const tokens = localStorage.getItem('google_calendar_tokens')
+            if (tokens) {
+              setSuccess('Google Calendar connected successfully!')
+              onProviderConnected({
+                id: 'google',
+                name: 'Google Calendar',
+                type: 'google',
+                status: 'connected'
+              })
+            } else {
+              setError('Authentication was cancelled or failed')
+            }
           }
         }, 1000)
       } else {
