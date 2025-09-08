@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
+  // Disable this endpoint in production for security
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
+  }
   const origin = request.nextUrl.origin
   const masks = (value?: string) => {
     if (!value) return null
