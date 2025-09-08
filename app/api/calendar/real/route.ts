@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const googleService = new GoogleCalendarService({
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
       clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      redirectUri: `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/auth/google`,
+      redirectUri: 'https://v0-voice-loop-hr-platform.vercel.app/api/calendar/auth/google',
       accessToken: params.accessToken,
       refreshToken: params.refreshToken
     })
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     const googleService = new GoogleCalendarService({
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
       clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      redirectUri: `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/auth/google`
+      redirectUri: 'https://v0-voice-loop-hr-platform.vercel.app/api/calendar/auth/google'
     })
 
     switch (action) {

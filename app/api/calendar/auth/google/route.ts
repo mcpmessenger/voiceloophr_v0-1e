@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const googleService = new GoogleCalendarService({
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET || '',
-      redirectUri: process.env.GOOGLE_CALENDAR_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/auth/google`,
+      redirectUri: process.env.GOOGLE_CALENDAR_REDIRECT_URI || 'https://v0-voice-loop-hr-platform.vercel.app/api/calendar/auth/google',
     })
 
     const authUrl = googleService.getAuthUrl(true) // Force account selection
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const googleService = new GoogleCalendarService({
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET || '',
-      redirectUri: process.env.GOOGLE_CALENDAR_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/auth/google`,
+      redirectUri: process.env.GOOGLE_CALENDAR_REDIRECT_URI || 'https://v0-voice-loop-hr-platform.vercel.app/api/calendar/auth/google',
     })
 
     const tokens = await googleService.getTokens(code)
