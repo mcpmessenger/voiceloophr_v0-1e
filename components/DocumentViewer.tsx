@@ -123,6 +123,17 @@ export function DocumentViewer({
       if (!response.ok) {
         const errorText = await response.text()
         console.error(`❌ DocumentViewer: API error ${response.status}:`, errorText)
+        // Try client-side fallback: read from localStorage if present
+        try {
+          const local = JSON.parse(localStorage.getItem('voiceloop_uploaded_files') || '{}')
+          const found = local[fileId]
+          const b64 = found?.localBase64
+          if (b64) {
+            console.log('📦 Using localBase64 fallback from localStorage')
+            setFileData(b64)
+            return b64
+          }
+        } catch {}
         throw new Error(`Failed to fetch file data: ${response.status} ${response.statusText}`)
       }
       

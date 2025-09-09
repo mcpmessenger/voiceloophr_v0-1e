@@ -285,34 +285,44 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-light">ElevenLabs Voice (ID or name)</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Enter voice name or ID (e.g., Jessica)"
+                  <Label className="text-sm font-light">ElevenLabs Voice</Label>
+                  <div className="flex gap-2 items-center">
+                    <select
+                      className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
                       value={elevenlabsVoice}
                       onChange={(e) => setElevenlabsVoice(e.target.value)}
-                      className="font-mono text-sm"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="font-light"
-                      onClick={async () => {
+                      onFocus={async (e) => {
+                        // Lazy-load voice list when user opens the dropdown
                         try {
+                          const el = e.currentTarget as HTMLSelectElement
+                          if (el.options.length > 1) return
                           const key = localStorage.getItem('voiceloop_elevenlabs_key')
                           if (!key) { alert('Add ElevenLabs key first'); return }
                           const resp = await fetch('/api/tts/voices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ elevenlabsKey: key }) })
                           const data = await resp.json()
                           if (!resp.ok || !data?.voices) { alert(data?.error || 'Failed to fetch voices'); return }
-                          const choice = window.prompt('Available voices (copy a name or ID):\n\n' + data.voices.map((v: any) => `${v.name} — ${v.id}`).join('\n'))
-                          if (choice) setElevenlabsVoice(choice)
-                        } catch (e) { alert('Failed to load voices'); }
+                          // Clear old options except current value placeholder
+                          while (el.options.length) el.remove(0)
+                          el.add(new Option('Select a voice...', ''))
+                          for (const v of data.voices as Array<{ id: string; name: string }>) {
+                            el.add(new Option(`${v.name} — ${v.id}`, v.id))
+                          }
+                        } catch (err) {
+                          alert('Failed to load voices')
+                        }
                       }}
                     >
-                      List Voices
-                    </Button>
+                      <option value="">Select a voice...</option>
+                      {elevenlabsVoice && <option value={elevenlabsVoice}>{elevenlabsVoice}</option>}
+                    </select>
+                    <Input
+                      placeholder="or type name/ID"
+                      value={elevenlabsVoice}
+                      onChange={(e) => setElevenlabsVoice(e.target.value)}
+                      className="font-mono text-sm max-w-[220px]"
+                    />
                   </div>
+                  <p className="text-xs text-muted-foreground">Dropdown lists your 11labs voices; you can also paste a custom ID.</p>
                 </div>
               </div>
             </Card>

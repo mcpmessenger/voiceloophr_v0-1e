@@ -118,12 +118,32 @@ export default function UploadPage() {
 
       // Save to localStorage for persistence (client-side)
       try {
+        // Optionally capture a small base64 for viewer fallback (only for small files)
+        let localBase64: string | undefined = undefined
+        try {
+          const SMALL_FILE_LIMIT = 8 * 1024 * 1024 // 8MB
+          if (uploadedFile.file.size <= SMALL_FILE_LIMIT) {
+            const readAsBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onload = () => {
+                const res = String(reader.result || '')
+                const comma = res.indexOf(',')
+                resolve(comma >= 0 ? res.slice(comma + 1) : res)
+              }
+              reader.onerror = () => reject(reader.error)
+              reader.readAsDataURL(file)
+            })
+            localBase64 = await readAsBase64(uploadedFile.file)
+          }
+        } catch {}
+
         const fileData = {
           id: uploadResult.fileId,
           name: uploadedFile.file.name,
           type: uploadedFile.file.type,
           size: uploadedFile.file.size,
-          buffer: "", // We don't need to store the full buffer in localStorage
+          buffer: "", // not storing server buffer; keep local copy below when small
+          localBase64,
           uploadedAt: new Date().toISOString(),
           processed: false,
           processingError: null,
@@ -352,7 +372,22 @@ export default function UploadPage() {
       clearTimeout(timeoutId)
 
       if (!processResponse.ok) {
-        throw new Error("Processing failed")
+        let serverMsg = "Processing failed"
+        try {
+          const data = await processResponse.json()
+          serverMsg = data?.error || data?.details || serverMsg
+        } catch {}
+        // Do not fail the whole upload; mark as completed with a warning so the user can still view the file
+        setFiles((prev) => prev.map((f) => (
+          f.id === fileId ? {
+            ...f,
+            status: "completed",
+            progress: 100,
+            warning: `AI analysis skipped: ${serverMsg}`
+          } : f
+        )))
+        toast(serverMsg)
+        return
       }
 
       // Mark as completed
@@ -366,26 +401,20 @@ export default function UploadPage() {
     } catch (error) {
       console.error("File processing error:", error)
       let errorMessage = "Processing failed"
-      
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          errorMessage = "Processing timed out. Please try again."
-        } else {
-          errorMessage = error.message
-        }
+        if (error.name === 'AbortError') errorMessage = "Processing timed out. Please try again."
+        else errorMessage = error.message
       }
-      
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileId
-            ? {
-                ...f,
-                status: "error",
-                error: errorMessage,
-              }
-            : f,
-        ),
-      )
+      // Do not hard-fail: mark completed with warning to keep UX smooth
+      setFiles((prev) => prev.map((f) => (
+        f.id === fileId ? {
+          ...f,
+          status: "completed",
+          progress: 100,
+          warning: `AI analysis skipped: ${errorMessage}`
+        } : f
+      )))
+      toast(errorMessage)
     }
   }
 

@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
 
     // Resolve voice: allow either voice ID or human-readable name (e.g., "Jessica")
     let voiceId = clientVoiceId || process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
-    const looksLikeId = typeof voiceId === 'string' && voiceId.length > 20 && !/\s/.test(voiceId)
-    if (!looksLikeId && typeof voiceId === 'string' && voiceId.trim().length > 0) {
+    const isLikelyId = typeof voiceId === 'string' && voiceId.length > 20 && !/\s/.test(voiceId)
+    if (!isLikelyId && typeof voiceId === 'string' && voiceId.trim().length > 0) {
       try {
         const voicesResp = await fetch('https://api.elevenlabs.io/v1/voices', {
           headers: { 'xi-api-key': elevenlabsKey }
@@ -31,6 +31,11 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         // Non-fatal: fall back to default if lookup fails
         console.warn('ElevenLabs voices lookup failed:', e)
+      }
+
+      // If we could not resolve a human-friendly name to an ID, use a known default ID
+      if (typeof voiceId === 'string' && (voiceId.trim().length === 0 || /\s/.test(voiceId) || voiceId.length <= 20)) {
+        voiceId = '21m00Tcm4TlvDq8ikWAM'
       }
     }
 
@@ -57,8 +62,11 @@ export async function POST(request: NextRequest) {
       try {
         const ct = response.headers.get('content-type') || ''
         if (ct.includes('application/json')) {
-          const errorData = await response.json()
-          errorMessage = errorData?.detail || errorData?.message || JSON.stringify(errorData)
+          const errorData: any = await response.json()
+          // Handle ElevenLabs error shape: { detail: { status, message } }
+          const nested = typeof errorData?.detail === 'object' ? (errorData.detail.message || errorData.detail.status) : undefined
+          const flat = errorData?.message || errorData?.error || errorData?.detail
+          errorMessage = String(nested || flat || JSON.stringify(errorData))
         } else {
           const textBody = await response.text()
           if (textBody) errorMessage = textBody

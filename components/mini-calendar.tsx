@@ -11,6 +11,7 @@ import {
   Clock, 
   MapPin, 
   Users,
+  AlertCircle,
   Plus,
   MoreHorizontal
 } from "lucide-react"
