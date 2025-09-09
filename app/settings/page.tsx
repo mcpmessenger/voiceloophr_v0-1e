@@ -166,6 +166,35 @@ export default function SettingsPage() {
                     <Button 
                       variant="outline" 
                       className="font-montserrat-light bg-transparent"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/calendar/auth/microsoft', { method: 'POST' })
+                          const data = await res.json()
+                          if (data?.authUrl) {
+                            const popup = window.open(
+                              data.authUrl,
+                              'microsoft-calendar-auth',
+                              'width=500,height=650,scrollbars=yes,resizable=yes'
+                            )
+                            const timer = setInterval(() => {
+                              if (popup?.closed) {
+                                clearInterval(timer)
+                                const tokens = localStorage.getItem('microsoft_calendar_tokens')
+                                if (tokens) {
+                                  alert('Microsoft connected successfully')
+                                }
+                              }
+                            }, 1000)
+                          }
+                        } catch {}
+                      }}
+                    >
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign in with Microsoft
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="font-montserrat-light bg-transparent"
                       onClick={handleEmailMagic}
                     >
                       <LogIn className="mr-2 h-4 w-4" />

@@ -44,6 +44,7 @@ export default function CalendarPage() {
   const [connectedProviders, setConnectedProviders] = useState<any[]>([])
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState<string | null>(null)
+  const [provider, setProvider] = useState<'google' | 'microsoft'>('google')
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [eventsByDate, setEventsByDate] = useState<Record<string, CalendarEvent[]>>({})
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -66,26 +67,42 @@ export default function CalendarPage() {
     location: ''
   })
 
+  // Store both providers' tokens so both connections can persist
+  const [googleTokens, setGoogleTokens] = useState<{ access_token: string; refresh_token?: string } | null>(null)
+  const [microsoftTokens, setMicrosoftTokens] = useState<{ access_token: string; refresh_token?: string } | null>(null)
+
   useEffect(() => {
     checkConnection()
-    // Check for stored tokens
-    const storedTokens = localStorage.getItem('google_calendar_tokens')
-    if (storedTokens) {
-      try {
-        const tokens = JSON.parse(storedTokens)
-        setAccessToken(tokens.access_token)
-        setRefreshToken(tokens.refresh_token)
-        setIsConnected(true)
-        setConnectedProviders(prev => {
-          const map = new Map<string, any>()
-          ;[...prev, { id: 'google', name: 'Google Calendar', type: 'google', status: 'connected' }].forEach(p => map.set(p.id, p))
-          return Array.from(map.values())
-        })
-        loadRealEvents()
-        loadMonthEvents(currentMonth)
-      } catch (error) {
-        console.error('Failed to parse stored tokens:', error)
+    // Load both providers' tokens from localStorage
+    try {
+      const g = localStorage.getItem('google_calendar_tokens')
+      const m = localStorage.getItem('microsoft_calendar_tokens')
+      const providers: any[] = []
+      if (g) {
+        const t = JSON.parse(g)
+        setGoogleTokens({ access_token: t.access_token, refresh_token: t.refresh_token })
+        providers.push({ id: 'google', name: 'Google Calendar', type: 'google', status: 'connected' })
       }
+      if (m) {
+        const t = JSON.parse(m)
+        setMicrosoftTokens({ access_token: t.access_token, refresh_token: t.refresh_token })
+        providers.push({ id: 'microsoft', name: 'Microsoft Calendar', type: 'microsoft', status: 'connected' })
+      }
+      if (providers.length > 0) {
+        setIsConnected(true)
+        setConnectedProviders(providers)
+        const defaultProvider: 'google' | 'microsoft' = providers.find(p => p.id === 'google') ? 'google' : 'microsoft'
+        setProvider(defaultProvider)
+        const defTokens = defaultProvider === 'google' ? g && JSON.parse(g) : m && JSON.parse(m)
+        if (defTokens) {
+          setAccessToken(defTokens.access_token)
+          setRefreshToken(defTokens.refresh_token || null)
+          loadRealEvents()
+          loadMonthEvents(currentMonth)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to parse stored tokens:', error)
     }
 
     // Listen for tokens arriving from OAuth popup (storage event)
@@ -93,14 +110,37 @@ export default function CalendarPage() {
       if (e.key === 'google_calendar_tokens' && e.newValue) {
         try {
           const tokens = JSON.parse(e.newValue)
-          setAccessToken(tokens.access_token)
-          setRefreshToken(tokens.refresh_token)
+          setGoogleTokens({ access_token: tokens.access_token, refresh_token: tokens.refresh_token })
           setIsConnected(true)
           setConnectedProviders(prev => {
             const map = new Map<string, any>()
             ;[...prev, { id: 'google', name: 'Google Calendar', type: 'google', status: 'connected' }].forEach(p => map.set(p.id, p))
             return Array.from(map.values())
           })
+          if (!accessToken) {
+            setProvider('google')
+            setAccessToken(tokens.access_token)
+            setRefreshToken(tokens.refresh_token)
+          }
+          setShowAuthModal(false)
+          loadMonthEvents(currentMonth)
+        } catch {}
+      }
+      if (e.key === 'microsoft_calendar_tokens' && e.newValue) {
+        try {
+          const tokens = JSON.parse(e.newValue)
+          setMicrosoftTokens({ access_token: tokens.access_token, refresh_token: tokens.refresh_token })
+          setIsConnected(true)
+          setConnectedProviders(prev => {
+            const map = new Map<string, any>()
+            ;[...prev, { id: 'microsoft', name: 'Microsoft Calendar', type: 'microsoft', status: 'connected' }].forEach(p => map.set(p.id, p))
+            return Array.from(map.values())
+          })
+          if (!accessToken) {
+            setProvider('microsoft')
+            setAccessToken(tokens.access_token)
+            setRefreshToken(tokens.refresh_token)
+          }
           setShowAuthModal(false)
           loadMonthEvents(currentMonth)
         } catch {}
@@ -112,7 +152,7 @@ export default function CalendarPage() {
 
   const checkConnection = async () => {
     try {
-      // Test if we can reach the Google OAuth API
+      // Test provider availability (google by default)
       const response = await fetch('/api/calendar/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
@@ -124,7 +164,10 @@ export default function CalendarPage() {
       if (data.success) {
         // keep provider label if already connected
         if (accessToken) {
-          setConnectedProviders([{ id: 'google', name: 'Google Calendar', type: 'google', status: 'connected' }])
+          const current = provider === 'microsoft' ?
+            [{ id: 'microsoft', name: 'Microsoft Calendar', type: 'microsoft', status: 'connected' }] :
+            [{ id: 'google', name: 'Google Calendar', type: 'google', status: 'connected' }]
+          setConnectedProviders(current)
           loadMonthEvents(currentMonth)
         }
       }
@@ -246,7 +289,8 @@ export default function CalendarPage() {
           start,
           end,
           accessToken,
-          refreshToken
+          refreshToken,
+          provider
         })
       })
       const data = await response.json()
@@ -262,7 +306,7 @@ export default function CalendarPage() {
           const hres = await fetch('/api/calendar/real', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'get-holidays-range', start, end, accessToken, refreshToken })
+            body: JSON.stringify({ action: 'get-holidays-range', start, end, accessToken, refreshToken, provider })
           })
           const hdata = await hres.json()
           if (hdata.success && Array.isArray(hdata.events)) {
@@ -280,8 +324,41 @@ export default function CalendarPage() {
 
   // Load month events on connection or when month changes
   useEffect(() => {
-    if (isConnected && accessToken) {
-      loadMonthEvents(currentMonth)
+    if (isConnected) {
+      // Load events for whichever provider is active first
+      if (accessToken) loadMonthEvents(currentMonth)
+      // Also overlay holidays/events from Google if we have Google tokens but Microsoft is active, and vice versa
+      // This keeps holidays visible when the non-active provider is Google
+      try {
+        const g = localStorage.getItem('google_calendar_tokens')
+        if (g) {
+          const t = JSON.parse(g)
+          fetch('/api/calendar/real', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'get-holidays-range',
+              start: startOfWeek(startOfMonth(currentMonth)).toISOString(),
+              end: endOfWeek(endOfMonth(currentMonth)).toISOString(),
+              accessToken: t.access_token,
+              refreshToken: t.refresh_token,
+              provider: 'google'
+            })
+          }).then(r=>r.json()).then(hdata => {
+            if (hdata?.success && Array.isArray(hdata.events)) {
+              setEventsByDate(prev => {
+                const map = { ...prev }
+                for (const ev of hdata.events) {
+                  const key = new Date(ev.startTime).toISOString().slice(0, 10)
+                  map[key] = map[key] || []
+                  map[key].push({ ...ev, status: 'confirmed' })
+                }
+                return map
+              })
+            }
+          }).catch(()=>{})
+        }
+      } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, accessToken, currentMonth])
@@ -300,6 +377,7 @@ export default function CalendarPage() {
           action: 'get-events',
           accessToken,
           refreshToken,
+          provider,
           days: 30
         })
       })
@@ -397,7 +475,8 @@ export default function CalendarPage() {
           description: scheduleForm.description,
           location: scheduleForm.location,
           accessToken,
-          refreshToken
+          refreshToken,
+          provider
         })
       })
 
@@ -539,6 +618,13 @@ export default function CalendarPage() {
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Connect Calendar
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => window.location.href = '/settings'}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Go to Settings to connect Outlook/Google
               </Button>
               
             <Button 
