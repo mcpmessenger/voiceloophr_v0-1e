@@ -40,11 +40,27 @@ const logos = [
 
 export default function LogoShowcase() {
   const [emblaRef, emblaApi] = useEmblaCarousel(
-    { loop: true, align: "start", dragFree: true, containScroll: "trimSnaps" },
-    [AutoScroll({ speed: 1.1, startDelay: 0, stopOnInteraction: false })]
+    { loop: true, align: "start", dragFree: false, containScroll: false },
+    [AutoScroll({ speed: 1.2, startDelay: 0, stopOnInteraction: false })]
   )
 
-  // No autoplay: continuous AutoScroll only to avoid timer conflicts/jank
+  // Ensure AutoScroll keeps playing on init and after any interaction
+  useEffect(() => {
+    if (!emblaApi) return
+    const auto = (emblaApi.plugins() as any)?.autoScroll
+    const play = () => {
+      try { auto?.play?.() } catch {}
+    }
+    play()
+    emblaApi.on('reInit', play).on('select', play).on('pointerUp', play)
+    return () => {
+      try {
+        emblaApi.off('reInit', play)
+        emblaApi.off('select', play)
+        emblaApi.off('pointerUp', play)
+      } catch {}
+    }
+  }, [emblaApi])
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-r from-background via-muted/20 to-background py-12">
