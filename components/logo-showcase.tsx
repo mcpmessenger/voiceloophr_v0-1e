@@ -1,9 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useState, useCallback } from "react"
-import useEmblaCarousel from "embla-carousel-react"
-import AutoScroll from "embla-carousel-auto-scroll"
+import { useMemo } from "react"
 
 const logos = [
   {
@@ -39,69 +37,56 @@ const logos = [
 ]
 
 export default function LogoShowcase() {
-  const [emblaRef, emblaApi] = useEmblaCarousel(
-    { loop: true, align: "start", dragFree: false, containScroll: false },
-    [AutoScroll({ speed: 1.2, startDelay: 0, stopOnInteraction: false })]
-  )
-
-  // Ensure AutoScroll keeps playing on init and after any interaction
-  useEffect(() => {
-    if (!emblaApi) return
-    const auto = (emblaApi.plugins() as any)?.autoScroll
-    const play = () => {
-      try { auto?.play?.() } catch {}
-    }
-    play()
-    emblaApi.on('reInit', play).on('select', play).on('pointerUp', play)
-    return () => {
-      try {
-        emblaApi.off('reInit', play)
-        emblaApi.off('select', play)
-        emblaApi.off('pointerUp', play)
-      } catch {}
-    }
-  }, [emblaApi])
+  // Duplicate track to create a seamless marquee loop
+  const track = useMemo(() => logos, [])
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-r from-background via-muted/20 to-background py-12">
-      <div className="absolute left-0 top-0 h-full w-48 bg-gradient-to-r from-background via-background/80 to-transparent z-10" />
-      <div className="absolute right-0 top-0 h-full w-48 bg-gradient-to-l from-background via-background/80 to-transparent z-10" />
+      <div className="absolute left-0 top-0 h-full w-48 bg-gradient-to-r from-background via-background/80 to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 h-full w-48 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none" />
 
-      <div className="embla" ref={emblaRef}>
-        <div className="embla__container flex gap-32">
-          {logos.map((logo: any, index) => {
-            const afterSpacing = logo.alt === 'Outlook' ? 'mr-24' : ''
-            return (
-            <div key={`${logo.alt}-${index}`} className={`embla__slide flex-[0_0_auto] px-2 ${afterSpacing}`}>
-              <div className={`h-24 ${(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 'w-24' : 'w-36'} flex items-center justify-center rounded-md`}
-                   style={{ zIndex: 1 }}>
-                <div className="block dark:hidden">
-                  <Image
-                    src={logo.lightSrc || logo.src}
-                    alt={logo.alt}
-                    width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80}
-                    height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80}
-                    className="h-full w-full object-contain drop-shadow-sm"
-                    sizes="84px"
-                    unoptimized
-                  />
-                </div>
-                <div className="hidden dark:block">
-                  <Image
-                    src={logo.src}
-                    alt={logo.alt}
-                    width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80}
-                    height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80}
-                    className="h-full w-full object-contain drop-shadow-sm"
-                    sizes="84px"
-                    unoptimized
-                  />
+      <div className="overflow-hidden">
+        <div className="marquee flex items-center" aria-hidden="false">
+          {/* Track A */}
+          <div className="flex items-center gap-32 pr-32">
+            {track.map((logo: any, index) => (
+              <div key={`A-${logo.alt}-${index}`} className="px-2">
+                <div className={`h-24 ${(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 'w-24' : 'w-36'} flex items-center justify-center rounded-md`}>
+                  <div className="block dark:hidden">
+                    <Image src={logo.lightSrc || logo.src} alt={logo.alt} width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80} height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80} className="h-full w-full object-contain drop-shadow-sm" sizes="84px" unoptimized />
+                  </div>
+                  <div className="hidden dark:block">
+                    <Image src={logo.src} alt={logo.alt} width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80} height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80} className="h-full w-full object-contain drop-shadow-sm" sizes="84px" unoptimized />
+                  </div>
                 </div>
               </div>
-            </div>
-          )})}
+            ))}
+          </div>
+          {/* Track B (duplicate) */}
+          <div className="flex items-center gap-32 pr-32" aria-hidden="true">
+            {track.map((logo: any, index) => (
+              <div key={`B-${logo.alt}-${index}`} className="px-2">
+                <div className={`h-24 ${(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 'w-24' : 'w-36'} flex items-center justify-center rounded-md`}>
+                  <div className="block dark:hidden">
+                    <Image src={logo.lightSrc || logo.src} alt={logo.alt} width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80} height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80} className="h-full w-full object-contain drop-shadow-sm" sizes="84px" unoptimized />
+                  </div>
+                  <div className="hidden dark:block">
+                    <Image src={logo.src} alt={logo.alt} width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80} height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80} className="h-full w-full object-contain drop-shadow-sm" sizes="84px" unoptimized />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .marquee { width: 200%; animation: marquee-scroll 40s linear infinite; }
+        @keyframes marquee-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
     </div>
   )
 }
