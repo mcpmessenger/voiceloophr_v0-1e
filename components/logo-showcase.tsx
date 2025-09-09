@@ -3,7 +3,6 @@
 import Image from "next/image"
 import { useEffect, useState, useCallback } from "react"
 import useEmblaCarousel from "embla-carousel-react"
-import Autoplay from "embla-carousel-autoplay"
 import AutoScroll from "embla-carousel-auto-scroll"
 
 const logos = [
@@ -42,24 +41,10 @@ const logos = [
 export default function LogoShowcase() {
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { loop: true, align: "start", dragFree: true, containScroll: "trimSnaps" },
-    [
-      AutoScroll({ speed: 1.2, startDelay: 0, stopOnInteraction: false }),
-      Autoplay({ delay: 3500, stopOnInteraction: false, stopOnMouseEnter: false })
-    ]
+    [AutoScroll({ speed: 1.1, startDelay: 0, stopOnInteraction: false })]
   )
 
-  // Ensure autoplay resumes after re-renders
-  const onSelect = useCallback(() => {
-    emblaApi?.plugins()?.autoplay?.play?.()
-  }, [emblaApi])
-
-  useEffect(() => {
-    if (!emblaApi) return
-    emblaApi.on("select", onSelect)
-    return () => {
-      try { emblaApi.off("select", onSelect) } catch {}
-    }
-  }, [emblaApi, onSelect])
+  // No autoplay: continuous AutoScroll only to avoid timer conflicts/jank
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-r from-background via-muted/20 to-background py-12">
