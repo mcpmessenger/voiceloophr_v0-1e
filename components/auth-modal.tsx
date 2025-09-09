@@ -77,8 +77,8 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <Card className="w-full max-w-sm p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <Card className="w-full max-w-sm p-6 bg-card text-card-foreground shadow-xl border-border">
         <div className="flex flex-col items-center text-center space-y-4">
           <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={56} height={56} className="rounded" />
           <h2 className="text-xl font-light">Sign in to VoiceLoop</h2>
@@ -89,7 +89,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
           <div className="w-full pt-2">
             <div className="text-xs text-muted-foreground mb-2 text-left">Or use email</div>
             <div className="flex gap-2">
-              <Input placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-background placeholder:text-muted-foreground" />
               <Button onClick={sendMagicLink} disabled={!email || sending} className="font-light">{sending ? 'Sending...' : 'Send link'}</Button>
             </div>
           </div>

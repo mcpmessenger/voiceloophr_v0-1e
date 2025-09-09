@@ -66,12 +66,32 @@ export default function GoogleDriveImport({ open, onClose, onPicked }: GoogleDri
       const { data: { session } } = await supabase!.auth.getSession()
       const token = (session as any)?.provider_token
       if (!token) return
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?alt=media`, {
+      // Use export endpoint for Google Workspace files
+      const isGoogleWorkspace = driveFile.mimeType?.startsWith('application/vnd.google-apps')
+      let downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFile.id}?alt=media`
+      let downloadName = driveFile.name
+      let downloadMime = driveFile.mimeType
+
+      if (isGoogleWorkspace) {
+        // Map Workspace types to export formats better suited for text extraction
+        const exportMap: Record<string, { mimeType: string; extension: string }> = {
+          'application/vnd.google-apps.document': { mimeType: 'text/plain', extension: '.txt' },
+          'application/vnd.google-apps.spreadsheet': { mimeType: 'text/csv', extension: '.csv' },
+          'application/vnd.google-apps.presentation': { mimeType: 'application/pdf', extension: '.pdf' },
+          'application/vnd.google-apps.drawing': { mimeType: 'image/png', extension: '.png' },
+        }
+        const target = exportMap[driveFile.mimeType] || { mimeType: 'application/pdf', extension: '.pdf' }
+        downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFile.id}/export?mimeType=${encodeURIComponent(target.mimeType)}`
+        downloadName = downloadName.replace(/\.[^/.]+$/, '') + target.extension
+        downloadMime = target.mimeType
+      }
+
+      const res = await fetch(downloadUrl, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Download failed')
       const blob = await res.blob()
-      const file = new File([blob], driveFile.name, { type: driveFile.mimeType })
+      const file = new File([blob], downloadName, { type: downloadMime })
       onPicked(file)
       onClose()
     } catch (e) {
@@ -83,18 +103,18 @@ export default function GoogleDriveImport({ open, onClose, onPicked }: GoogleDri
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <Card className="w-full max-w-lg p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <Card className="w-full max-w-lg p-6 bg-card text-card-foreground shadow-xl border-border">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-light">Import from Google Drive</h3>
           <Button variant="ghost" onClick={onClose} className="font-light">Close</Button>
         </div>
 
         {loading && <div className="text-sm text-muted-foreground">Loading files...</div>}
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-destructive">{error}</div>}
 
         {!loading && !error && (
-          <div className="max-h-80 overflow-auto divide-y">
+          <div className="max-h-80 overflow-auto divide-y divide-border">
             {files.map((f) => (
               <div key={f.id} className="py-2 flex items-center justify-between">
                 <div className="min-w-0">

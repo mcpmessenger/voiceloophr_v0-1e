@@ -13,6 +13,8 @@ import { Navigation } from '@/components/navigation'
 export default function HomePage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
+  const [altWordIdx, setAltWordIdx] = useState(0)
+  const altWords = ["Ideas", "Summaries", "Conversations", "Appointments", "Insights"]
 
   useEffect(() => {
     const loadUser = async () => {
@@ -24,6 +26,11 @@ export default function HomePage() {
       } catch {}
     }
     loadUser()
+  }, [])
+
+  useEffect(() => {
+    const t = setInterval(() => setAltWordIdx(i => (i + 1) % altWords.length), 2200)
+    return () => clearInterval(t)
   }, [])
 
   const handleOAuth = async (provider: 'google' | 'linkedin_oidc') => {
@@ -72,8 +79,8 @@ export default function HomePage() {
               <Image
                 src="https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png"
                 alt="VoiceLoop"
-                width={120}
-                height={120}
+                width={180}
+                height={180}
                 className="mx-auto mb-8 rounded-2xl"
               />
             </div>
@@ -81,8 +88,8 @@ export default function HomePage() {
               <Image
                 src="/images/voiceloop-logo.png"
                 alt="VoiceLoop"
-                width={120}
-                height={120}
+                width={180}
+                height={180}
                 className="mx-auto mb-8 rounded-2xl"
               />
             </div>
@@ -90,7 +97,9 @@ export default function HomePage() {
 
           <h1 className="text-5xl md:text-6xl font-montserrat-light text-foreground mb-6 text-balance">
             Transform Documents into
-            <span className="text-secondary"> Conversations</span>
+            <span className="ml-2 px-2 rounded bg-transparent text-foreground/70 dark:text-secondary">
+              {altWords[altWordIdx]}
+            </span>
           </h1>
 
           <p className="text-xl text-muted-foreground font-montserrat-light mb-8 max-w-2xl mx-auto text-pretty">
@@ -130,15 +139,6 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-thin border-border/50 py-8 px-6">
         <div className="container mx-auto text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="block dark:hidden">
-              <Image src="https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png" alt="VoiceLoop" width={24} height={24} className="rounded" />
-            </div>
-            <div className="hidden dark:block">
-              <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={24} height={24} className="rounded" />
-            </div>
-            <span className="text-sm font-montserrat-light text-muted-foreground">VoiceLoop HR - AI Document Processing</span>
-          </div>
           <p className="text-sm text-muted-foreground font-montserrat-light">
             © 2025 VoiceLoop. Transform documents into conversations.
           </p>

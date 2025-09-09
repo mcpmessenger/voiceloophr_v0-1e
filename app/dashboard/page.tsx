@@ -29,6 +29,7 @@ import GuestModeIndicator from "@/components/guest-mode-indicator"
 import { LogoLoader } from "@/components/logo-loader"
 import { Navigation } from "@/components/navigation"
 import { MiniCalendar } from "@/components/mini-calendar"
+import VoiceChat from "@/components/voice-chat"
 
 interface Document {
   id: string
@@ -446,6 +447,13 @@ export default function DashboardPage() {
           <p className="text-muted-foreground font-montserrat-light">
             Manage your documents and track your AI processing activity
           </p>
+        </div>
+
+        {/* Voice Chat (open by default) */}
+        <div className="mb-8">
+          <Card className="p-4 border-thin">
+            <VoiceChat />
+          </Card>
         </div>
 
         {/* Stats Cards */}

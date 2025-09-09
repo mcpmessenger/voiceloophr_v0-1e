@@ -31,9 +31,46 @@ const montserrat = Montserrat({
 
 
 export const metadata: Metadata = {
-  title: "VoiceLoop HR - AI Document Processing & Voice Interaction",
+  title: "VoiceLoop HR – AI Document Processing, Voice Chat, Calendar & Search",
   description:
-    "Transform your documents into searchable, conversational knowledge with AI-powered summaries and voice capabilities.",
+    "Upload, parse, and search documents with AI. Summaries, RAG search, Google Drive imports, Calendar scheduling, and voice chat (OpenAI/ElevenLabs).",
+  keywords: [
+    'AI document processing',
+    'HR document analysis',
+    'PDF parser',
+    'semantic search',
+    'RAG',
+    'voice chat',
+    'text to speech',
+    'speech to text',
+    'Google Drive import',
+    'Google Calendar integration',
+    'Supabase',
+    'OpenAI',
+    'ElevenLabs'
+  ],
+  authors: [{ name: 'VoiceLoop' }],
+  viewport: { width: 'device-width', initialScale: 1, maximumScale: 1 },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: 'VoiceLoop HR – AI Document Processing, Voice Chat, Calendar & Search',
+    description:
+      'Upload, parse, and search documents with AI. Summaries, RAG search, Google Drive imports, Calendar scheduling, and voice chat.',
+    url: 'https://v0-voice-loop-hr-platform.vercel.app',
+    siteName: 'VoiceLoop HR',
+    images: [
+      { url: 'https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png', width: 1200, height: 630 },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'VoiceLoop HR – AI Document Processing, Voice Chat, Calendar & Search',
+    description:
+      'Upload, parse, and search documents with AI. Summaries, RAG search, Google Drive imports, Calendar scheduling, and voice chat.',
+    images: ['https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png'],
+  },
   generator: "v0.app",
   icons: {
     icon: [

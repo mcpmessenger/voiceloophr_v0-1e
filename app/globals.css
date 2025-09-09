@@ -123,6 +123,14 @@
       transform: translateX(-50%);
     }
   }
+  @keyframes scroll-x-quarter {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-25%);
+    }
+  }
   
   .animate-scroll-x {
     animation: scroll-x 45s linear infinite;
@@ -130,5 +138,8 @@
 
   .animate-scroll-x-fast {
     animation: scroll-x 20s linear infinite;
+  }
+  .animate-scroll-x-quarter {
+    animation: scroll-x-quarter 28s linear infinite;
   }
 }

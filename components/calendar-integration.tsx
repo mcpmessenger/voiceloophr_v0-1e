@@ -195,7 +195,7 @@ export function CalendarIntegration({
 
       {/* Schedule Meeting Form */}
       {showScheduleForm && (
-        <Card className="p-4 border-primary/20">
+        <Card className="p-4 border-primary/20 bg-card text-card-foreground">
           <h4 className="font-medium mb-4">Schedule Meeting</h4>
           <div className="space-y-4">
             <div>
@@ -204,7 +204,7 @@ export function CalendarIntegration({
                 type="text"
                 value={scheduleForm.title}
                 onChange={(e) => setScheduleForm(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 border rounded-md"
+                className="w-full mt-1 px-3 py-2 border rounded-md bg-background placeholder:text-muted-foreground"
                 placeholder="Meeting title"
               />
             </div>
@@ -214,7 +214,7 @@ export function CalendarIntegration({
               <textarea
                 value={scheduleForm.description}
                 onChange={(e) => setScheduleForm(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 border rounded-md"
+                className="w-full mt-1 px-3 py-2 border rounded-md bg-background placeholder:text-muted-foreground"
                 rows={3}
                 placeholder="Meeting description"
               />
@@ -227,7 +227,7 @@ export function CalendarIntegration({
                   type="datetime-local"
                   value={scheduleForm.startTime}
                   onChange={(e) => setScheduleForm(prev => ({ ...prev, startTime: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2 border rounded-md"
+                  className="w-full mt-1 px-3 py-2 border rounded-md bg-background"
                 />
               </div>
               <div>
@@ -236,7 +236,7 @@ export function CalendarIntegration({
                   type="datetime-local"
                   value={scheduleForm.endTime}
                   onChange={(e) => setScheduleForm(prev => ({ ...prev, endTime: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2 border rounded-md"
+                  className="w-full mt-1 px-3 py-2 border rounded-md bg-background"
                 />
               </div>
             </div>
@@ -247,7 +247,7 @@ export function CalendarIntegration({
                 type="text"
                 value={scheduleForm.attendees}
                 onChange={(e) => setScheduleForm(prev => ({ ...prev, attendees: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 border rounded-md"
+                className="w-full mt-1 px-3 py-2 border rounded-md bg-background placeholder:text-muted-foreground"
                 placeholder="user1@company.com, user2@company.com"
               />
             </div>
@@ -258,7 +258,7 @@ export function CalendarIntegration({
                 type="text"
                 value={scheduleForm.location}
                 onChange={(e) => setScheduleForm(prev => ({ ...prev, location: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 border rounded-md"
+                className="w-full mt-1 px-3 py-2 border rounded-md bg-background placeholder:text-muted-foreground"
                 placeholder="Conference Room A"
               />
             </div>

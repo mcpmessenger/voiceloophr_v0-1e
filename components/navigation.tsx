@@ -46,34 +46,13 @@ export function Navigation({
     <header className="border-b border-thin border-border/50">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <div className="block dark:hidden">
-              <Image 
-                src="https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png" 
-                alt="VoiceLoop" 
-                width={56} 
-                height={56} 
-                className="rounded-lg" 
-                priority
-              />
-            </div>
-            <div className="hidden dark:block">
-              <Image 
-                src="/images/voiceloop-logo.png" 
-                alt="VoiceLoop" 
-                width={56} 
-                height={56} 
-                className="rounded-lg" 
-                priority
-              />
-            </div>
-          </Link>
-          
-          <div className="flex items-center gap-2">
+          {/* Left area: user avatar aligned left (brand removed) */}
+          <div className="flex items-center">
             {userId && (
-              <div className="flex items-center gap-2 mr-1 pl-2 pr-3 py-1 rounded-full border border-border/50 bg-background/60">
+              <div className="flex items-center gap-2 pl-2 pr-3 py-1 rounded-full border border-border/50 bg-background/60">
                 {avatarUrl ? (
-                  <Image src={avatarUrl} alt="User" width={24} height={24} className="rounded-full" />
+                  <img src={avatarUrl} alt="User" width={24} height={24} className="rounded-full"
+                       referrerPolicy="no-referrer" onError={() => setAvatarUrl(null)} />
                 ) : (
                   <div className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px]">
                     {(userLabel || 'U').slice(0,2).toUpperCase()}
@@ -84,6 +63,9 @@ export function Navigation({
                 </span>
               </div>
             )}
+          </div>
+          
+          <div className="flex items-center gap-2">
             {showHomeButton && (
               <Button variant="outline" size="sm" className="font-montserrat-light bg-transparent" asChild>
                 <Link href="/">
@@ -95,16 +77,14 @@ export function Navigation({
             {showDashboardButton && (
               <Button variant="outline" size="sm" className="font-montserrat-light bg-transparent" asChild>
                 <Link href="/dashboard">
-                  <LayoutDashboard className="mr-2 h-4 w-4" />
-                  Dashboard
+                  <LayoutDashboard className="h-4 w-4" />
                 </Link>
               </Button>
             )}
             
             <Button variant="outline" size="sm" className="font-montserrat-light bg-transparent" asChild>
               <Link href="/calendar">
-                <Calendar className="mr-2 h-4 w-4" />
-                Calendar
+                <Calendar className="h-4 w-4" />
               </Link>
             </Button>
             
@@ -114,8 +94,7 @@ export function Navigation({
               <>
                 <Button variant="outline" size="sm" className="font-montserrat-light bg-transparent" asChild>
                   <Link href="/settings">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
+                    <Settings className="h-4 w-4" />
                   </Link>
                 </Button>
                 <Button
@@ -136,8 +115,7 @@ export function Navigation({
             ) : (
               <Button variant="outline" size="sm" className="font-montserrat-light bg-transparent" asChild>
                 <Link href="/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  <Settings className="h-4 w-4" />
                 </Link>
               </Button>
             )}

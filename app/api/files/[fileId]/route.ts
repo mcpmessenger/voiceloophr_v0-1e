@@ -24,6 +24,8 @@ export async function GET(
     console.log(`🔑 Available fileIds: ${Array.from(storage.keys()).join(', ')}`)
     
     if (!fileData) {
+      // Try to retrieve from client-side localStorage via a signed echo response
+      // Not possible server-side; return detailed 404 to allow client fallback
       console.log(`❌ File not found: ${fileId}`)
       console.log(`📊 Available files in storage:`, Array.from(storage.keys()))
       return NextResponse.json(

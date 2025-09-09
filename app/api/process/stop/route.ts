@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Check if file is currently processing
-    if (fileData.status !== 'processing') {
+    // Check if file is currently processing (be lenient; allow stopping if unknown/missing status)
+    if (fileData.status && fileData.status !== 'processing') {
       return NextResponse.json({ 
         error: "File not processing", 
         details: `File is currently in '${fileData.status}' state, not processing`,
