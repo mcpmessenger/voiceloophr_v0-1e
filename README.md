@@ -182,6 +182,30 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
      - Write (optional, for "Save to Drive"): `https://www.googleapis.com/auth/drive.file`
    - Set redirect URI: `https://your-domain.com/auth/callback`
 
+### **Microsoft (Outlook) Calendar Setup**
+
+1. Azure App Registration
+   - Go to the Azure Portal → App registrations → New registration
+   - Supported account types: Accounts in any organizational directory and personal Microsoft accounts (common)
+   - Redirect URI (Web): `http://localhost:3000/auth/microsoft/callback` (dev) or your production URL
+
+2. API Permissions
+   - Add Microsoft Graph delegated permissions:
+     - `offline_access`
+     - `Calendars.Read`
+     - `Calendars.ReadWrite`
+   - Grant admin consent (if required)
+
+3. Environment Variables
+   - `MICROSOFT_CLIENT_ID`
+   - `MICROSOFT_CLIENT_SECRET`
+   - `MICROSOFT_REDIRECT_URI` (optional; defaults to `/auth/microsoft/callback`)
+
+4. Behavior
+   - Settings includes “Sign in with Microsoft”
+   - Tokens are stored in `localStorage` under `microsoft_calendar_tokens`
+   - Calendar view supports both Google and Microsoft; holidays are fetched from Google when available
+
 3. **Document Import Features**
    - Import entire folder structures
    - Auto-sync with Drive changes
@@ -236,7 +260,8 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 
 ### **Document Management**
 - `POST /api/upload` - Upload and process documents
-- `GET /api/files/[fileId]` - Retrieve file data
+- `GET /api/files/[fileId]` - Retrieve file data (returns signed URL when available)
+- `DELETE /api/files/[fileId]` - Delete storage object, DB rows, and local record
 - `POST /api/textract` - Process PDF documents
 - `POST /api/analyze` - AI analysis of documents
 
@@ -249,6 +274,29 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 - `GET /api/documents` - List user documents
 - `POST /api/documents/save` - Save documents to database
 - `DELETE /api/documents/[id]` - Delete documents
+
+## 💾 Persistent Original Storage
+
+- All uploads are saved to Supabase Storage bucket `files` when configured.
+- Storage path format: `userId/fileId/originalName` (or `guest/fileId/originalName`).
+- Upload API returns `storagePath` and `contentType`.
+- Viewer prefers a signed Storage URL returned by `/api/files/[fileId]`; falls back to base64.
+- Delete flow: call `DELETE /api/files/[fileId]` to remove the storage object and related DB rows.
+
+Supabase setup:
+- Create bucket `files` and grant appropriate policies.
+- Set env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+
+## 📅 Calendar: Google + Microsoft
+
+- Settings includes “Sign in with Microsoft” mirroring Google.
+- Microsoft scopes: `offline_access Calendars.Read Calendars.ReadWrite`.
+- Tokens are stored client-side in `localStorage` keys `google_calendar_tokens` and `microsoft_calendar_tokens`.
+- Calendar API `/api/calendar/real` accepts `provider` in body: `google` (default) or `microsoft`.
+- Microsoft auth endpoints at `/api/calendar/auth/microsoft` (GET/POST).
+
+Microsoft env vars:
+- `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`
 
 ## 🎯 Key Features Explained
 
@@ -420,3 +468,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Built with ❤️ by the VoiceLoop Team**
 
 *Transforming document analysis with the power of AI*
+
+<!-- build: trigger vercel deploy -->

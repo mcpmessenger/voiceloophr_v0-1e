@@ -8,13 +8,13 @@ import AutoScroll from "embla-carousel-auto-scroll"
 
 const logos = [
   {
-    src: "https://automationalien.s3.us-east-1.amazonaws.com/OpenAI.png",
-    lightSrc: "https://automationalien.s3.us-east-1.amazonaws.com/OpenAI_Logo.svg",
+    src: "https://automationalien.s3.us-east-1.amazonaws.com/OpenAI-white-wordmark.svg",
+    lightSrc: "https://automationalien.s3.us-east-1.amazonaws.com/OpenAI-black-wordmark.svg",
     alt: "OpenAI"
   },
   {
-    src: "https://automationalien.s3.us-east-1.amazonaws.com/elevenlabsblk.png",
-    lightSrc: "https://automationalien.s3.us-east-1.amazonaws.com/ElevenLabs_logo_white(2022-2024).png",
+    src: "https://automationalien.s3.us-east-1.amazonaws.com/elevenlabs-logo-white.svg",
+    lightSrc: "https://automationalien.s3.us-east-1.amazonaws.com/elevenlabs-logo-black.svg",
     alt: "ElevenLabs"
   },
   {
@@ -72,14 +72,14 @@ export default function LogoShowcase() {
             const afterSpacing = logo.alt === 'Outlook' ? 'mr-24' : ''
             return (
             <div key={`${logo.alt}-${index}`} className={`embla__slide flex-[0_0_auto] px-2 ${afterSpacing}`}>
-              <div className={`h-24 ${(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive') ? 'w-28' : 'w-36'} flex items-center justify-center rounded-md`}
+              <div className={`h-24 ${(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 'w-24' : 'w-36'} flex items-center justify-center rounded-md`}
                    style={{ zIndex: 1 }}>
                 <div className="block dark:hidden">
                   <Image
                     src={logo.lightSrc || logo.src}
                     alt={logo.alt}
-                    width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive') ? 68 : 80}
-                    height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive') ? 68 : 80}
+                    width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80}
+                    height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80}
                     className="h-full w-full object-contain drop-shadow-sm"
                     sizes="84px"
                     unoptimized
@@ -89,8 +89,8 @@ export default function LogoShowcase() {
                   <Image
                     src={logo.src}
                     alt={logo.alt}
-                    width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive') ? 68 : 80}
-                    height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive') ? 68 : 80}
+                    width={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80}
+                    height={(logo.alt === 'Google Calendar' || logo.alt === 'Google Drive' || logo.alt === 'Outlook') ? 60 : 80}
                     className="h-full w-full object-contain drop-shadow-sm"
                     sizes="84px"
                     unoptimized

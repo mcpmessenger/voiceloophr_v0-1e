@@ -68,6 +68,7 @@ export function DocumentViewer({
   const [activeTab, setActiveTab] = useState("summary")
   // Removed blue modal state; we render in-tab only
   const [fileData, setFileData] = useState<string | null>(null)
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
   const [loadingFileData, setLoadingFileData] = useState(false)
 
   const copyToClipboard = async (text: string, type: string) => {
@@ -140,10 +141,20 @@ export function DocumentViewer({
       const result = await response.json()
       console.log(`📄 DocumentViewer: Response data:`, result)
       
-      if (result.success && result.file?.buffer) {
-        console.log(`✅ DocumentViewer: File data loaded successfully`)
-        setFileData(result.file.buffer)
-        return result.file.buffer
+      if (result.success) {
+        if (result.file?.signedUrl) {
+          setSignedUrl(result.file.signedUrl)
+        } else {
+          setSignedUrl(null)
+        }
+        if (result.file?.buffer) {
+          console.log(`✅ DocumentViewer: File data loaded successfully`)
+          setFileData(result.file.buffer)
+          return result.file.buffer
+        }
+        if (result.file?.signedUrl) {
+          return null
+        }
       } else {
         console.error(`❌ DocumentViewer: No file data in response:`, result)
         throw new Error('No file data available in response')
@@ -367,6 +378,27 @@ export function DocumentViewer({
                   <Download className="mr-2 h-4 w-4" />
                   Download
                 </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="font-light"
+                  onClick={async () => {
+                    if (!confirm('Delete this file and its stored copy?')) return
+                    try {
+                      const res = await fetch(`/api/files/${document.id}`, { method: 'DELETE' })
+                      if (res.ok) {
+                        alert('File deleted')
+                      } else {
+                        const t = await res.text()
+                        alert('Delete failed: ' + t)
+                      }
+                    } catch (e) {
+                      alert('Delete error')
+                    }
+                  }}
+                >
+                  Delete
+                </Button>
               </div>
             </div>
             
@@ -388,6 +420,7 @@ export function DocumentViewer({
                 <DocumentViewerContent 
                   document={document}
                   fileData={fileData}
+                  signedUrl={signedUrl}
                   loadingFileData={loadingFileData}
                   onLoadFileData={() => fetchFileData(document.id)}
                 />
@@ -496,6 +529,7 @@ interface DocumentViewerContentProps {
     extractedText: string
   }
   fileData: string | null
+  signedUrl?: string | null
   loadingFileData: boolean
   onLoadFileData: () => void
 }
@@ -503,6 +537,7 @@ interface DocumentViewerContentProps {
 function DocumentViewerContent({ 
   document, 
   fileData, 
+  signedUrl,
   loadingFileData, 
   onLoadFileData 
 }: DocumentViewerContentProps) {
@@ -587,22 +622,91 @@ function DocumentViewerContent({
       )
     }
 
+    // Helper to decode base64 to UTF-8 string
+    const decodeBase64 = (b64: string | null): string | null => {
+      if (!b64) return null
+      try {
+        // atob gives latin1; decodeURIComponent(escape()) converts to UTF-8
+        return decodeURIComponent(escape(atob(b64)))
+      } catch {
+        try { return atob(b64) } catch { return null }
+      }
+    }
+
+    // Markdown preview (lightweight)
+    const isMarkdown = document.type.includes("markdown") || document.name?.toLowerCase().endsWith('.md')
+    if (isMarkdown) {
+      const md = decodeBase64(fileData) || document.extractedText || ''
+      return (
+        <div className="h-[70vh] overflow-auto rounded-md border p-4 bg-muted/10">
+          <pre className="whitespace-pre-wrap text-sm leading-6 font-light text-foreground">
+            {md}
+          </pre>
+        </div>
+      )
+    }
+
+    // CSV preview (lightweight parser)
+    const isCsv = document.type.includes('csv') || document.name?.toLowerCase().endsWith('.csv')
+    if (isCsv) {
+      const csvText = decodeBase64(fileData) || document.extractedText || ''
+      const parseCsv = (text: string): string[][] => {
+        const rows: string[][] = []
+        let row: string[] = []
+        let cur = ''
+        let inside = false
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i]
+          if (inside) {
+            if (ch === '"') {
+              if (text[i + 1] === '"') { cur += '"'; i++ } else { inside = false }
+            } else { cur += ch }
+          } else {
+            if (ch === '"') inside = true
+            else if (ch === ',') { row.push(cur); cur = '' }
+            else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = '' }
+            else if (ch === '\r') { /* ignore */ }
+            else { cur += ch }
+          }
+        }
+        row.push(cur); rows.push(row)
+        return rows
+      }
+      const rows = parseCsv(csvText)
+      return (
+        <div className="h-[70vh] overflow-auto rounded-md border">
+          <table className="min-w-full text-sm">
+            <tbody>
+              {rows.map((r, idx) => (
+                <tr key={idx} className={idx === 0 ? 'bg-muted/20 font-medium' : ''}>
+                  {r.map((c, cidx) => (
+                    <td key={cidx} className="border-b border-border/40 px-3 py-2 align-top whitespace-pre-wrap">{c}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+
+    // Prefer signed URL when available
     if (document.type.includes("pdf")) {
-      const pdfUrl = `data:application/pdf;base64,${fileData}`
+      const pdfUrl = signedUrl || `data:application/pdf;base64,${fileData}`
       return (
         <iframe src={pdfUrl} className="w-full h-[70vh] rounded-md border" />
       )
     } else if (document.type.startsWith("image/")) {
       return (
         <div className="flex flex-col items-center justify-center h-full">
-          <img src={fileUrl} alt={document.name} className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg" />
+          <img src={signedUrl || fileUrl || undefined} alt={document.name} className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg" />
         </div>
       )
     } else if (document.type.startsWith("audio/")) {
       return (
         <div className="flex flex-col items-center justify-center h-full">
           <Music className="h-16 w-16 text-primary mb-4" />
-          <audio controls src={fileUrl} className="w-full max-w-md"></audio>
+          <audio controls src={signedUrl || fileUrl || undefined} className="w-full max-w-md"></audio>
           <p className="text-sm text-muted-foreground mt-2">Audio file preview</p>
         </div>
       )
@@ -610,7 +714,7 @@ function DocumentViewerContent({
       return (
         <div className="flex flex-col items-center justify-center h-full">
           <VideoIcon className="h-16 w-16 text-primary mb-4" />
-          <video controls src={fileUrl} className="w-full max-w-xl rounded-lg shadow-lg"></video>
+          <video controls src={signedUrl || fileUrl || undefined} className="w-full max-w-xl rounded-lg shadow-lg"></video>
           <p className="text-sm text-muted-foreground mt-2">Video file preview</p>
         </div>
       )

@@ -79,18 +79,19 @@ export default function HomePage() {
               <Image
                 src="https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png"
                 alt="VoiceLoop"
-                width={180}
-                height={180}
+                width={240}
+                height={240}
                 className="mx-auto mb-8 rounded-2xl"
               />
             </div>
             <div className="hidden dark:block">
               <Image
-                src="/images/voiceloop-logo.png"
+                src="https://automationalien.s3.us-east-1.amazonaws.com/transparent+bkgd.png"
                 alt="VoiceLoop"
-                width={180}
-                height={180}
+                width={240}
+                height={240}
                 className="mx-auto mb-8 rounded-2xl"
+                priority
               />
             </div>
           </div>

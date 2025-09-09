@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { initializeGlobalStorage, setFileInGlobalStorage } from "@/lib/global-storage"
+import { supabaseAdmin, supabase } from "@/lib/supabase"
 
 // Textract client removed - using fixed PDF parser instead
 
@@ -134,6 +135,25 @@ export async function POST(request: NextRequest) {
     // Store in global memory using shared utility
     setFileInGlobalStorage(fileId, fileData)
     
+    // Persist raw file to Supabase Storage when configured
+    let storagePath: string | null = null
+    const contentType = file.type || 'application/octet-stream'
+    try {
+      const client = supabaseAdmin || supabase
+      if (client) {
+        const bucket = 'files'
+        const userSegment = userId || 'guest'
+        const path = `${userSegment}/${fileId}/${encodeURIComponent(file.name)}`
+        const { error } = await (client as any).storage.from(bucket).upload(path, buffer, {
+          contentType,
+          upsert: true
+        })
+        if (!error) storagePath = `${bucket}/${path}`
+      }
+    } catch (e) {
+      console.warn('Storage upload skipped/failed:', e)
+    }
+    
     // Optionally save to database with embeddings
     let saved = false
     let documentId: string | null = null
@@ -156,6 +176,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Attach storage metadata to in-memory record for downstream fetch/signed URLs
+    try {
+      const storage = initializeGlobalStorage()
+      const existing = storage.get(fileId)
+      if (existing) {
+        existing.storagePath = storagePath
+        existing.contentType = contentType
+        storage.set(fileId, existing)
+      }
+    } catch {}
+
     // Note: localStorage will be handled client-side after successful upload
 
     // Return success response
@@ -168,6 +199,8 @@ export async function POST(request: NextRequest) {
       wordCount: wordCount,
       extractedText: extractedText ? extractedText.substring(0, 200) + (extractedText.length > 200 ? "..." : "") : "",
       saved,
+      storagePath,
+      contentType,
       documentId,
       message: processingMethod === "direct" ? "File uploaded and text extracted successfully" : 
                processingMethod === "textract" ? "File uploaded successfully. Text extraction requires AWS Textract processing." :
