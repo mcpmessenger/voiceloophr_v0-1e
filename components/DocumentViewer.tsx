@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -36,8 +37,16 @@ const ClientPDFViewer = dynamic(() => import('./ClientPDFViewer'), {
   ssr: false,
   loading: () => (
     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-      <p className="text-lg">Loading PDF viewer...</p>
+      <div className="animate-pulse h-12 w-12 mx-auto mb-4">
+        <Image
+          src="https://automationalien.s3.us-east-1.amazonaws.com/transparent+bkgd.png"
+          alt="VoiceLoop"
+          width={48}
+          height={48}
+          className="h-full w-full object-contain"
+        />
+      </div>
+      <p className="text-lg font-light">Loading PDF viewer...</p>
     </div>
   )
 })
@@ -606,8 +615,16 @@ function DocumentViewerContent({
     if (loadingFileData) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg">Loading document...</p>
+          <div className="animate-pulse h-12 w-12 mx-auto mb-4">
+            <Image
+              src="https://automationalien.s3.us-east-1.amazonaws.com/transparent+bkgd.png"
+              alt="VoiceLoop"
+              width={48}
+              height={48}
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <p className="text-lg font-light">Loading document...</p>
         </div>
       )
     }

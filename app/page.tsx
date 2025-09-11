@@ -96,15 +96,16 @@ export default function HomePage() {
             </div>
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-montserrat-light text-foreground mb-6 text-balance">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-montserrat-light text-foreground mb-6 text-balance">
             Transform Documents into
-            <span className="ml-2 px-2 rounded bg-transparent text-foreground/70 dark:text-secondary">
+            <br className="sm:hidden" />
+            <span className="ml-0 sm:ml-2 px-2 rounded bg-transparent text-foreground/70 dark:text-secondary inline-block">
               {altWords[altWordIdx]}
             </span>
           </h1>
 
           <p className="text-xl text-muted-foreground font-montserrat-light mb-8 max-w-2xl mx-auto text-pretty">
-            Upload any document or audio file and engage in intelligent voice conversations with AI-powered summaries
+            Upload any document and engage in intelligent voice conversations with AI-powered summaries
             and semantic search.
           </p>
 

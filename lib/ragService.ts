@@ -275,7 +275,7 @@ export class RAGService {
     query: string,
     userId?: string,
     limit: number = 10,
-    threshold: number = 0.5
+    threshold: number = 0.1
   ): Promise<{ success: boolean; results: SearchResult[]; error?: string }> {
     try {
       if (!supabaseAdmin) {
@@ -336,7 +336,7 @@ export class RAGService {
   private static async searchDocumentsInGuestMode(
     query: string,
     limit: number = 10,
-    threshold: number = 0.5
+    threshold: number = 0.1
   ): Promise<{ success: boolean; results: SearchResult[]; error?: string }> {
     try {
       if (typeof window === 'undefined') {

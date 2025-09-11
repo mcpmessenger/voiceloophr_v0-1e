@@ -2,32 +2,46 @@
 
 import Image from "next/image"
 
-interface LogoLoaderProps {
-  size?: "sm" | "md" | "lg"
+interface SophisticatedLoaderProps {
+  size?: "sm" | "md" | "lg" | "xl"
   text?: string
+  className?: string
 }
 
-export function LogoLoader({ size = "md", text = "Processing..." }: LogoLoaderProps) {
+export function SophisticatedLoader({ 
+  size = "md", 
+  text, 
+  className = "" 
+}: SophisticatedLoaderProps) {
   const sizeClasses = {
-    sm: "h-8 w-8",
+    sm: "h-6 w-6",
     md: "h-12 w-12", 
-    lg: "h-16 w-16"
+    lg: "h-16 w-16",
+    xl: "h-24 w-24"
   }
 
   const textSizes = {
     sm: "text-sm",
     md: "text-base",
-    lg: "text-lg"
+    lg: "text-lg",
+    xl: "text-xl"
+  }
+
+  const dimensions = {
+    sm: 24,
+    md: 48,
+    lg: 64,
+    xl: 96
   }
 
   return (
-    <div className="flex flex-col items-center justify-center space-y-3">
+    <div className={`flex flex-col items-center justify-center space-y-3 ${className}`}>
       <div className={`${sizeClasses[size]} animate-pulse`}>
         <Image
           src="https://automationalien.s3.us-east-1.amazonaws.com/transparent+bkgd.png"
           alt="VoiceLoop"
-          width={size === "sm" ? 32 : size === "md" ? 48 : 64}
-          height={size === "sm" ? 32 : size === "md" ? 48 : 64}
+          width={dimensions[size]}
+          height={dimensions[size]}
           className="h-full w-full object-contain"
         />
       </div>
