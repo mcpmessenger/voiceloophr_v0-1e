@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { 
   ChevronLeft, 
@@ -78,8 +79,16 @@ export default function ClientPDFViewer({ fileData, document }: ClientPDFViewerP
   if (!isClient) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-        <p className="text-lg">Loading PDF viewer...</p>
+        <div className="animate-pulse h-12 w-12 mx-auto mb-4">
+          <Image
+            src="https://automationalien.s3.us-east-1.amazonaws.com/transparent+bkgd.png"
+            alt="VoiceLoop"
+            width={48}
+            height={48}
+            className="h-full w-full object-contain"
+          />
+        </div>
+        <p className="text-lg font-light">Loading PDF viewer...</p>
       </div>
     )
   }
@@ -141,8 +150,16 @@ export default function ClientPDFViewer({ fileData, document }: ClientPDFViewerP
               className="max-w-full h-auto"
               loading={
                 <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
-                  <p>Loading PDF...</p>
+                  <div className="animate-pulse h-8 w-8 mb-2">
+                    <Image
+                      src="https://automationalien.s3.us-east-1.amazonaws.com/transparent+bkgd.png"
+                      alt="VoiceLoop"
+                      width={32}
+                      height={32}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <p className="font-light">Loading PDF...</p>
                 </div>
               }
               error={

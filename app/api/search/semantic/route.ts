@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const query = body?.query?.trim()
     const userId = body?.userId
     const limit = Math.min(Math.max(body?.limit ?? 10, 1), 50)
-    const threshold = body?.threshold ?? 0.5
+    const threshold = body?.threshold ?? 0.1
 
     if (!query) {
       return NextResponse.json({ error: 'Query parameter is required' }, { status: 400 })

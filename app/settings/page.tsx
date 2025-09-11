@@ -110,11 +110,11 @@ export default function SettingsPage() {
       <Navigation />
 
       {/* Settings Content */}
-      <section className="py-12 px-6">
+      <section className="py-8 sm:py-12 px-4 sm:px-6">
         <div className="container mx-auto max-w-2xl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-montserrat-light text-foreground mb-2">Settings</h1>
-            <p className="text-muted-foreground font-montserrat-light">
+          <div className="mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-montserrat-light text-foreground mb-2">Settings</h1>
+            <p className="text-sm sm:text-base text-muted-foreground font-montserrat-light">
               Configure your account and API keys to enable AI processing and voice features
             </p>
           </div>
@@ -146,26 +146,26 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground font-montserrat-light">
                     Sign in to sync your documents and settings across devices.
                   </p>
-                  <div className="flex gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button 
                       variant="outline" 
-                      className="font-montserrat-light bg-transparent"
+                      className="font-montserrat-light bg-transparent text-sm"
                       onClick={() => handleOAuth('google')}
                     >
                       <LogIn className="mr-2 h-4 w-4" />
-                      Sign in with Google
+                      Google
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="font-montserrat-light bg-transparent"
+                      className="font-montserrat-light bg-transparent text-sm"
                       onClick={() => handleOAuth('linkedin_oidc')}
                     >
                       <LogIn className="mr-2 h-4 w-4" />
-                      Sign in with LinkedIn
+                      LinkedIn
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="font-montserrat-light bg-transparent"
+                      className="font-montserrat-light bg-transparent text-sm"
                       onClick={async () => {
                         try {
                           const res = await fetch('/api/calendar/auth/microsoft', { method: 'POST' })
@@ -190,11 +190,11 @@ export default function SettingsPage() {
                       }}
                     >
                       <LogIn className="mr-2 h-4 w-4" />
-                      Sign in with Microsoft
+                      Microsoft
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="font-montserrat-light bg-transparent"
+                      className="font-montserrat-light bg-transparent text-sm"
                       onClick={handleEmailMagic}
                     >
                       <LogIn className="mr-2 h-4 w-4" />

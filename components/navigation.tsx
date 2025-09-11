@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { LayoutDashboard, Settings, Calendar } from "lucide-react"
+import { LayoutDashboard, Settings } from "lucide-react"
 import { useEffect, useMemo, useState } from 'react'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -82,11 +82,6 @@ export function Navigation({
               </Button>
             )}
             
-            <Button variant="outline" size="sm" className="font-montserrat-light bg-transparent" asChild>
-              <Link href="/calendar">
-                <Calendar className="h-4 w-4" />
-              </Link>
-            </Button>
             
             <ThemeToggle />
             

@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Loader2
 } from "lucide-react"
+import { SophisticatedLoader } from "@/components/sophisticated-loader"
 import { CalendarServiceMCP } from "@/lib/services/calendar-mcp"
 
 interface CalendarIntegrationProps {
@@ -163,7 +164,9 @@ export function CalendarIntegration({
           disabled={isLoading}
         >
           {isLoading ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <div className="h-4 w-4 mr-2">
+              <SophisticatedLoader size="sm" />
+            </div>
           ) : (
             <Calendar className="h-4 w-4 mr-2" />
           )}
@@ -276,7 +279,9 @@ export function CalendarIntegration({
                 disabled={isLoading || !scheduleForm.startTime || !scheduleForm.endTime}
               >
                 {isLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <div className="h-4 w-4 mr-2">
+                    <SophisticatedLoader size="sm" />
+                  </div>
                 ) : (
                   <CheckCircle className="h-4 w-4 mr-2" />
                 )}
@@ -305,7 +310,9 @@ export function CalendarIntegration({
             disabled={isLoading}
           >
             {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="h-4 w-4">
+                <SophisticatedLoader size="sm" />
+              </div>
             ) : (
               <Calendar className="h-4 w-4" />
             )}
@@ -315,7 +322,7 @@ export function CalendarIntegration({
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <SophisticatedLoader size="md" />
           </div>
         ) : upcomingEvents.length > 0 ? (
           <div className="space-y-3">

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Search, FileText, File, Music, Video, Clock, Star, Loader2 } from "lucide-react"
+import { SophisticatedLoader } from "@/components/sophisticated-loader"
 
 interface SearchResult {
   id: string
@@ -217,7 +218,13 @@ export default function SearchInterface() {
               />
             </div>
             <Button type="submit" disabled={!query.trim() || isSearching} className="font-light px-8">
-              {isSearching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+              {isSearching ? (
+                <div className="h-4 w-4 mr-2">
+                  <SophisticatedLoader size="sm" />
+                </div>
+              ) : (
+                <Search className="h-4 w-4 mr-2" />
+              )}
               {isSearching ? "Searching..." : "Search"}
             </Button>
           </div>

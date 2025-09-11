@@ -317,7 +317,15 @@ export default function ResultsPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="animate-pulse h-12 w-12 mx-auto mb-4">
+            <Image
+              src="https://automationalien.s3.us-east-1.amazonaws.com/transparent+bkgd.png"
+              alt="VoiceLoop"
+              width={48}
+              height={48}
+              className="h-full w-full object-contain"
+            />
+          </div>
           <p className="text-muted-foreground font-light">
             {loading ? "Loading results..." : "Initializing..."}
           </p>

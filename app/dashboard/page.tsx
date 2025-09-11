@@ -26,9 +26,9 @@ import {
   AlertCircle,
 } from "lucide-react"
 import GuestModeIndicator from "@/components/guest-mode-indicator"
-import { LogoLoader } from "@/components/logo-loader"
+import { SophisticatedLoader } from "@/components/sophisticated-loader"
 import { Navigation } from "@/components/navigation"
-import { MiniCalendar } from "@/components/mini-calendar"
+import { FullCalendar } from "@/components/full-calendar"
 import VoiceChat from "@/components/voice-chat"
 
 interface Document {
@@ -456,47 +456,9 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6 border-thin">
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-primary" />
-              <div>
-                <p className="text-2xl font-montserrat-light text-foreground">{stats.totalDocuments}</p>
-                <p className="text-sm text-muted-foreground font-montserrat-light">Total Documents</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 border-thin">
-            <div className="flex items-center gap-3">
-              <Activity className="h-8 w-8 text-secondary" />
-              <div>
-                <p className="text-2xl font-montserrat-light text-foreground">{stats.totalProcessed}</p>
-                <p className="text-sm text-muted-foreground font-montserrat-light">Processed</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 border-thin">
-            <div className="flex items-center gap-3">
-              <Search className="h-8 w-8 text-accent" />
-              <div>
-                <p className="text-2xl font-montserrat-light text-foreground">{stats.totalSearches}</p>
-                <p className="text-sm text-muted-foreground font-montserrat-light">Searches</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 border-thin">
-            <div className="flex items-center gap-3">
-              <MessageCircle className="h-8 w-8 text-primary" />
-              <div>
-                <p className="text-2xl font-montserrat-light text-foreground">{stats.totalChats}</p>
-                <p className="text-sm text-muted-foreground font-montserrat-light">Voice Chats</p>
-              </div>
-            </div>
-          </Card>
+        {/* Full Calendar */}
+        <div className="mb-8">
+          <FullCalendar />
         </div>
 
         {/* Quick Actions */}
@@ -511,7 +473,7 @@ export default function DashboardPage() {
           <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" asChild>
             <Link href="/search">
               <Search className="mr-3 h-6 w-6" />
-              Semantic Search
+              Search All Documents
             </Link>
           </Button>
 
@@ -522,6 +484,7 @@ export default function DashboardPage() {
             </Link>
           </Button>
         </div>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Documents List */}
@@ -553,7 +516,7 @@ export default function DashboardPage() {
             <div className="space-y-4">
               {loading && documents.length === 0 ? (
                 <div className="text-center py-8">
-                  <LogoLoader size="md" text="Loading documents..." />
+                  <SophisticatedLoader size="md" text="Loading documents..." />
                 </div>
               ) : documents.length === 0 ? (
                 <div className="text-center py-8">
@@ -594,11 +557,6 @@ export default function DashboardPage() {
                           <Badge variant="outline" className={`font-light ${getStatusColor(doc.status)}`}>
                             {doc.status}
                           </Badge>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </div>
                         </div>
                       </div>
 
@@ -639,9 +597,9 @@ export default function DashboardPage() {
                               </Link>
                             </Button>
                             <Button variant="outline" size="sm" className="font-light bg-transparent text-primary border-primary/30 hover:border-primary hover:bg-primary/5" asChild>
-                              <Link href={`/search?docId=${doc.id}`}>
+                              <Link href="/search">
                                 <Search className="mr-2 h-4 w-4" />
-                                Search
+                                Search All Docs
                               </Link>
                             </Button>
                             <Button 
@@ -666,9 +624,6 @@ export default function DashboardPage() {
 
           {/* Right Sidebar */}
           <div className="space-y-6">
-            {/* Mini Calendar */}
-            <MiniCalendar className="border-thin" />
-            
             {/* Recent Activity */}
             <div>
               <h2 className="text-xl font-light text-foreground mb-4">Recent Activity</h2>
@@ -688,31 +643,48 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            {/* Usage Insights */}
-            <Card className="p-6 border-thin">
-              <div className="flex items-center gap-3 mb-4">
-                <TrendingUp className="h-5 w-5 text-accent" />
-                <h3 className="font-light text-lg">Usage Insights</h3>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-light text-muted-foreground">Documents this week</span>
-                  <span className="text-sm font-medium text-foreground">4</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-light text-muted-foreground">Average processing time</span>
-                  <span className="text-sm font-medium text-foreground">2.8s</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-light text-muted-foreground">Most used feature</span>
-                  <span className="text-sm font-medium text-foreground">Voice Chat</span>
-                </div>
-              </div>
-            </Card>
           </div>
         </div>
+
       </div>
+
+      {/* Footer */}
+      <footer className="bg-muted/30 border-t border-border/50 py-8 mt-12">
+        <div className="container mx-auto px-6 max-w-7xl">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <Link href="/" className="hover:opacity-80 transition-opacity">
+              <div className="block dark:hidden">
+                <Image
+                  src="https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png"
+                  alt="VoiceLoopHR"
+                  width={80}
+                  height={80}
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="hidden dark:block">
+                <Image
+                  src="https://automationalien.s3.us-east-1.amazonaws.com/transparent+bkgd.png"
+                  alt="VoiceLoopHR"
+                  width={80}
+                  height={80}
+                  className="rounded-lg"
+                />
+              </div>
+            </Link>
+            <p className="text-sm text-muted-foreground font-montserrat-light">
+              <a 
+                href="https://voiceloophr.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors"
+              >
+                voiceloophr.com
+              </a>
+            </p>
+          </div>
+        </div>
+      </footer>
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmDoc && (
