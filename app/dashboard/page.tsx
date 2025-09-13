@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -29,7 +30,11 @@ import GuestModeIndicator from "@/components/guest-mode-indicator"
 import { SophisticatedLoader } from "@/components/sophisticated-loader"
 import { Navigation } from "@/components/navigation"
 import { FullCalendar } from "@/components/full-calendar"
+import PlaceholderCalendar from "@/components/placeholder-calendar"
+import PlaceholderDocuments from "@/components/placeholder-documents"
 import VoiceChat from "@/components/voice-chat"
+import { AuthModal } from "@/components/auth-modal"
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
 
 interface Document {
   id: string
@@ -52,6 +57,8 @@ interface ActivityItem {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const [userId, setUserId] = useState<string | null>(null)
   const [documents, setDocuments] = useState<Document[]>([])
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -59,6 +66,7 @@ export default function DashboardPage() {
   const [deleting, setDeleting] = useState(false)
   const [stoppingProcessing, setStoppingProcessing] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [authModalOpen, setAuthModalOpen] = useState(false)
   const [stats, setStats] = useState({
     totalDocuments: 0,
     totalProcessed: 0,
@@ -66,20 +74,84 @@ export default function DashboardPage() {
     totalChats: 0,
   })
 
+  // Load user authentication state
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const supabase = getSupabaseBrowser()
+        if (!supabase) return
+        const { data: { user } } = await supabase.auth.getUser()
+        setUserId(user?.id ?? null)
+      } catch (error) {
+        console.error('Error loading user:', error)
+        setUserId(null)
+      }
+    }
+    loadUser()
+
+    // Listen for global auth modal events
+    const handleShowAuthModal = () => setAuthModalOpen(true)
+    window.addEventListener('showAuthModal', handleShowAuthModal)
+    
+    return () => {
+      window.removeEventListener('showAuthModal', handleShowAuthModal)
+    }
+
+    // Listen for auth state changes
+    const supabase = getSupabaseBrowser()
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setUserId(null)
+          setDocuments([])
+          setRecentActivity([])
+          setStats({
+            totalDocuments: 0,
+            totalProcessed: 0,
+            totalSearches: 0,
+            totalChats: 0,
+          })
+          // Clear global storage for this user
+          try {
+            await fetch('/api/clear-storage', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: session?.user?.id || 'anonymous' })
+            })
+          } catch (error) {
+            console.error('Error clearing storage:', error)
+          }
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          setUserId(session.user.id)
+          // Clear any existing global storage when user signs in
+          try {
+            await fetch('/api/clear-storage', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ clearAll: true })
+            })
+          } catch (error) {
+            console.error('Error clearing storage on sign-in:', error)
+          }
+        }
+      })
+
+      return () => subscription.unsubscribe()
+    }
+  }, [])
+
   const loadDocuments = async () => {
     setLoading(true)
     try {
-      // Include user filter if signed in (server reads userId query param)
-      let userIdParam = ''
-      try {
-        const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
-        const supabase = getSupabaseBrowser()
-        if (supabase) {
-          const { data: { user } } = await supabase.auth.getUser()
-          if (user?.id) userIdParam = `?userId=${encodeURIComponent(user.id)}`
-        }
-      } catch {}
+      // Only load documents if user is authenticated
+      if (!userId) {
+        setDocuments([])
+        setLoading(false)
+        return
+      }
 
+      // Include user filter if signed in (server reads userId query param)
+      const userIdParam = `?userId=${encodeURIComponent(userId)}`
       const res = await fetch(`/api/documents${userIdParam}`)
       const data = await res.json().catch(() => ({}))
       
@@ -98,7 +170,7 @@ export default function DashboardPage() {
         }))
       }
 
-      // Also load documents from localStorage as fallback/supplement
+      // Load localStorage documents as fallback/supplement for authenticated users only
       let localStorageDocuments: Document[] = []
       try {
         const { LocalStorageManager } = await import('@/lib/utils/storage')
@@ -155,13 +227,15 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    loadDocuments()
-    
-    // Set up auto-refresh every 30 seconds
-    const interval = setInterval(loadDocuments, 30000)
-    
-    return () => clearInterval(interval)
-  }, [])
+    if (userId) {
+      loadDocuments()
+      
+      // Set up auto-refresh every 30 seconds
+      const interval = setInterval(loadDocuments, 30000)
+      
+      return () => clearInterval(interval)
+    }
+  }, [userId])
 
   const getFileIcon = (type: string, name?: string) => {
     const fileName = name?.toLowerCase() || ''
@@ -456,194 +530,82 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Full Calendar */}
+        {/* Calendar - Show placeholder for unauthenticated users, full calendar for authenticated users */}
         <div className="mb-8">
-          <FullCalendar />
+          {userId ? (
+            <FullCalendar />
+          ) : (
+            <PlaceholderCalendar />
+          )}
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Show for all users, trigger auth for unauthenticated */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Button size="lg" className="h-16 font-light text-lg" asChild>
-            <Link href="/upload">
+          {userId ? (
+            <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" asChild>
+              <Link href="/upload">
+                <Upload className="mr-3 h-6 w-6" />
+                Upload Documents
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" onClick={() => setAuthModalOpen(true)}>
               <Upload className="mr-3 h-6 w-6" />
               Upload Documents
-            </Link>
-          </Button>
+            </Button>
+          )}
 
-          <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" asChild>
-            <Link href="/search">
+          {userId ? (
+            <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" asChild>
+              <Link href="/search">
+                <Search className="mr-3 h-6 w-6" />
+                Search All Documents
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" onClick={() => setAuthModalOpen(true)}>
               <Search className="mr-3 h-6 w-6" />
               Search All Documents
-            </Link>
-          </Button>
+            </Button>
+          )}
 
-          <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" asChild>
-            <Link href="/chat">
+          {userId ? (
+            <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" asChild>
+              <Link href="/chat">
+                <MessageCircle className="mr-3 h-6 w-6" />
+                Voice Chat
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" size="lg" className="h-16 font-light text-lg bg-transparent" onClick={() => setAuthModalOpen(true)}>
               <MessageCircle className="mr-3 h-6 w-6" />
               Voice Chat
-            </Link>
-          </Button>
+            </Button>
+          )}
         </div>
 
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Documents List */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-light text-foreground">Recent Documents</h2>
-              <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
-                <Link href="/upload">Upload New</Link>
-              </Button>
-            </div>
-
-            {documents.length > 0 && (
-              <div className="flex items-center justify-between p-2 border rounded-md bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" checked={selectedIds.size === documents.length} onChange={toggleSelectAll} />
-                  <span className="text-sm text-muted-foreground">Select all</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="font-light bg-transparent" onClick={bulkStop} disabled={selectedIds.size === 0 || deleting}>
-                    Stop Selected
-                  </Button>
-                  <Button variant="destructive" size="sm" className="font-light" onClick={bulkDelete} disabled={selectedIds.size === 0 || deleting}>
-                    {deleting ? 'Deleting...' : 'Delete Selected'}
-                  </Button>
-                </div>
+        {/* Recent Documents - Show placeholder for unauthenticated users */}
+        <div className="mb-8">
+          {userId ? (
+            <div className="space-y-6">
+              <div className="flex items-center">
+                <h2 className="text-xl font-light text-foreground">Recent Documents</h2>
               </div>
-            )}
-
-            <div className="space-y-4">
-              {loading && documents.length === 0 ? (
-                <div className="text-center py-8">
-                  <SophisticatedLoader size="md" text="Loading documents..." />
-                </div>
-              ) : documents.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground font-light mb-4">No documents uploaded yet</p>
-                  <Button asChild>
-                    <Link href="/upload">
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload Your First Document
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                documents.map((doc) => (
-                <Card key={doc.id} className="p-6 border-thin hover:border-accent/50 transition-colors">
-                  <div className="flex items-start gap-4">
-                    <div className="pt-1"><input type="checkbox" checked={selectedIds.has(doc.id)} onChange={() => toggleSelect(doc.id)} /></div>
-                    <div className="flex-shrink-0">{getFileIcon(doc.type, doc.name)}</div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4 mb-2">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-medium text-foreground truncate">{doc.name}</h3>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground font-light">
-                            <span>{formatFileSize(doc.size)}</span>
-                            <span>•</span>
-                            <span>Uploaded {formatDate(doc.uploadedAt)}</span>
-                            {doc.lastAccessed && (
-                              <>
-                                <span>•</span>
-                                <span>Last accessed {formatDate(doc.lastAccessed)}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Badge variant="outline" className={`font-light ${getStatusColor(doc.status)}`}>
-                            {doc.status}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      {doc.summary && (
-                        <p className="text-sm text-muted-foreground font-light mb-3 line-clamp-2">{doc.summary}</p>
-                      )}
-
-                      {doc.status === "processing" ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground font-light">Processing...</span>
-                            <span className="text-muted-foreground font-light">75%</span>
-                          </div>
-                          <Progress value={75} className="h-2" />
-                          <div className="flex items-center gap-2 mt-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="font-light bg-transparent border-2 border-red-300 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700 transition-all duration-200"
-                              onClick={() => stopProcessing(doc.id)}
-                              disabled={stoppingProcessing === doc.id}
-                            >
-                              {stoppingProcessing === doc.id ? "Stopping..." : "Stop Processing"}
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="h-4 w-4" />
-                            <span className="font-light">Uploaded {formatDate(doc.uploadedAt)}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="font-light bg-transparent" asChild>
-                              <Link href={`/results/${doc.id}`}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Document
-                              </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" className="font-light bg-transparent text-primary border-primary/30 hover:border-primary hover:bg-primary/5" asChild>
-                              <Link href="/search">
-                                <Search className="mr-2 h-4 w-4" />
-                                Search All Docs
-                              </Link>
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                              onClick={() => setDeleteConfirmDoc(doc.id)}
-                              disabled={deleting}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                                      </div>
-                  </Card>
-                ))
-              )}
+              <div className="text-center py-8">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground font-light mb-4">No documents uploaded yet</p>
+                <Button asChild>
+                  <Link href="/upload">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Your First Document
+                  </Link>
+                </Button>
+              </div>
             </div>
-          </div>
-
-          {/* Right Sidebar */}
-          <div className="space-y-6">
-            {/* Recent Activity */}
-            <div>
-              <h2 className="text-xl font-light text-foreground mb-4">Recent Activity</h2>
-
-              <Card className="p-6 border-thin">
-                <div className="space-y-4">
-                  {recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-0.5">{getActivityIcon(activity.type)}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-light text-foreground">{activity.description}</p>
-                        <p className="text-xs text-muted-foreground font-light">{formatDate(activity.timestamp)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-
-          </div>
+          ) : (
+            <PlaceholderDocuments />
+          )}
         </div>
 
       </div>
@@ -652,6 +614,7 @@ export default function DashboardPage() {
       <footer className="bg-muted/30 border-t border-border/50 py-8 mt-12">
         <div className="container mx-auto px-6 max-w-7xl">
           <div className="flex flex-col items-center justify-center space-y-4">
+            {/* Logo moved to bottom */}
             <Link href="/" className="hover:opacity-80 transition-opacity">
               <div className="block dark:hidden">
                 <Image
@@ -672,15 +635,9 @@ export default function DashboardPage() {
                 />
               </div>
             </Link>
-            <p className="text-sm text-muted-foreground font-montserrat-light">
-              <a 
-                href="https://voiceloophr.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="hover:text-foreground transition-colors"
-              >
-                voiceloophr.com
-              </a>
+            {/* Updated copyright tagline */}
+            <p className="text-sm text-muted-foreground font-montserrat-light text-center">
+              © 2025 VoiceLoop. Transform documents into conversations.
             </p>
           </div>
         </div>
@@ -722,6 +679,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Auth Modal */}
+      <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
     </div>
   )
 }
