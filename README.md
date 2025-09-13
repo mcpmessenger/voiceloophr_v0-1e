@@ -480,3 +480,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <!-- build: trigger vercel deploy -->
 <!-- AWS_AMPLIFY_DEPLOY_FLAG: 2025-01-13T01:50:00Z -->
 <!-- MAIN_BRANCH_DEPLOY_TRIGGER: 2025-01-13T01:55:00Z -->
+<!-- AMPLIFY_BUILD_TRIGGER: 2025-01-13T02:15:00Z -->
+<!-- BUILD_CONFIG_READY: amplify.yml + npm fallbacks configured -->
