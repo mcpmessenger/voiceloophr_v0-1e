@@ -146,7 +146,7 @@ export default function SaveToDatabaseButton({
           onClick={handleSaveToDatabase}
           disabled={saving}
           size="sm"
-          className="font-light bg-blue-600 hover:bg-blue-700 text-white"
+          className="font-light bg-gray-600 hover:bg-gray-700 text-white"
         >
           {saving ? (
             <>

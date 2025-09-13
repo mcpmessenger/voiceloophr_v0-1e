@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 
 interface AuthModalProps {
@@ -13,8 +12,6 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ open, onClose }: AuthModalProps) {
-  const [email, setEmail] = useState('')
-  const [sending, setSending] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -30,14 +27,16 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
 
   if (!open) return null
 
-  const openOAuth = async (provider: 'google' | 'linkedin_oidc') => {
+  const openOAuth = async (provider: 'google' | 'linkedin_oidc' | 'azure') => {
     try {
       const supabase = getSupabaseBrowser()
       if (!supabase) return
       const redirectTo = `${window.location.origin}/auth/callback`
       const scopes = provider === 'google'
-        ? 'openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file'
-        : 'openid profile email'
+        ? 'openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.readonly'
+        : provider === 'linkedin_oidc'
+        ? 'openid profile email'
+        : 'openid email profile offline_access https://graph.microsoft.com/calendars.read'
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -45,7 +44,9 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
           skipBrowserRedirect: true,
           // Provider-specific scopes
           scopes,
-          queryParams: { prompt: 'consent select_account', access_type: 'offline' }
+          queryParams: provider === 'azure' 
+            ? { prompt: 'consent' }
+            : { prompt: 'consent select_account', access_type: 'offline' }
         }
       })
       if (error) throw error
@@ -61,20 +62,6 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     }
   }
 
-  const sendMagicLink = async () => {
-    if (!email) return
-    try {
-      setSending(true)
-      const supabase = getSupabaseBrowser()
-      if (!supabase) return
-      await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } })
-      alert('Check your email for the sign-in link.')
-    } catch (e) {
-      console.error('Magic link error:', e)
-    } finally {
-      setSending(false)
-    }
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
@@ -83,16 +70,15 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
           <Image src="/images/voiceloop-logo.png" alt="VoiceLoop" width={56} height={56} className="rounded" />
           <h2 className="text-xl font-light">Sign in to VoiceLoop</h2>
 
-          <Button className="w-full font-light" onClick={() => openOAuth('google')}>Sign in with Google</Button>
-          <Button className="w-full font-light" variant="outline" onClick={() => openOAuth('linkedin_oidc')}>Sign in with LinkedIn</Button>
-
-          <div className="w-full pt-2">
-            <div className="text-xs text-muted-foreground mb-2 text-left">Or use email</div>
-            <div className="flex gap-2">
-              <Input placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-background placeholder:text-muted-foreground" />
-              <Button onClick={sendMagicLink} disabled={!email || sending} className="font-light">{sending ? 'Sending...' : 'Send link'}</Button>
-            </div>
-          </div>
+          <Button className="w-full font-light" onClick={() => openOAuth('google')}>
+            Sign in with Google
+          </Button>
+          <Button className="w-full font-light" variant="outline" onClick={() => openOAuth('linkedin_oidc')}>
+            Sign in with LinkedIn
+          </Button>
+          <Button className="w-full font-light" variant="outline" onClick={() => openOAuth('azure')}>
+            Sign in with Microsoft
+          </Button>
 
           <Button variant="ghost" className="w-full font-light" onClick={onClose}>Cancel</Button>
         </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -32,7 +32,9 @@ interface ProcessedFile {
 
 export default function ResultsPage() {
   const params = useParams()
+  const router = useRouter()
   const fileId = params.fileId as string
+  const [userId, setUserId] = useState<string | null>(null)
   const [fileData, setFileData] = useState<ProcessedFile | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
@@ -48,6 +50,38 @@ export default function ResultsPage() {
   useEffect(() => {
     setIsBrowser(typeof window !== 'undefined' && typeof document !== 'undefined')
   }, [])
+
+  // Load user authentication state and listen for changes
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const supabase = getSupabaseBrowser()
+        if (!supabase) return
+        const { data: { user } } = await supabase.auth.getUser()
+        setUserId(user?.id ?? null)
+      } catch (error) {
+        console.error('Error loading user:', error)
+        setUserId(null)
+      }
+    }
+    loadUser()
+
+    // Listen for auth state changes
+    const supabase = getSupabaseBrowser()
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setUserId(null)
+          // Redirect to home page when user signs out
+          router.push('/')
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          setUserId(session.user.id)
+        }
+      })
+
+      return () => subscription.unsubscribe()
+    }
+  }, [router])
 
   useEffect(() => {
     const loadResults = async () => {
@@ -481,7 +515,7 @@ export default function ResultsPage() {
       {/* Inline Unified Voice Chat */}
       {fileData && (
         <div id="inline-voice-chat" className="container mx-auto px-6 pb-12">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <UnifiedVoiceChat documentText={fileData.extractedText} documentName={fileData.name} />
           </div>
         </div>

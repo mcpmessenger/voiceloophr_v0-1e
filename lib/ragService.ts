@@ -138,8 +138,13 @@ export class RAGService {
         chunks.push(chunk)
       }
 
-      // Move start position with overlap
+      // Move start position with overlap - FIXED: ensure we always move forward
       start = Math.max(start + 1, chunkEnd - this.CHUNK_OVERLAP)
+      
+      // Safety check to prevent infinite loops
+      if (start >= text.length) {
+        break
+      }
     }
 
     return chunks

@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Mic, MicOff, Volume2, Send, Loader2, MessageCircle, Search } from "lucide-react"
-import { SophisticatedLoader } from "@/components/sophisticated-loader"
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
+import { Mic, MicOff, Volume2, Send, Loader2, MessageCircle } from "lucide-react"
 
 interface Message {
   id: string
@@ -16,8 +16,6 @@ interface Message {
   content: string
   timestamp: Date
   isVoice?: boolean
-  isSearchResult?: boolean
-  searchResults?: any[]
 }
 
 interface VoiceChatProps {
@@ -28,6 +26,7 @@ interface VoiceChatProps {
 }
 
 export default function VoiceChat({ fileId, fileName, documentText, documentName }: VoiceChatProps) {
+  const [userId, setUserId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isRecording, setIsRecording] = useState(false)
@@ -39,16 +38,54 @@ export default function VoiceChat({ fileId, fileName, documentText, documentName
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
   const [audioProgress, setAudioProgress] = useState(0)
   const [pendingAudioUrl, setPendingAudioUrl] = useState<string | null>(null)
-  const [isSearchMode, setIsSearchMode] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Load user authentication state and listen for changes
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const supabase = getSupabaseBrowser()
+        if (!supabase) return
+        const { data: { user } } = await supabase.auth.getUser()
+        setUserId(user?.id ?? null)
+      } catch (error) {
+        console.error('Error loading user:', error)
+        setUserId(null)
+      }
+    }
+    loadUser()
+
+    // Listen for auth state changes
+    const supabase = getSupabaseBrowser()
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setUserId(null)
+          // Clear all chat data when user signs out
+          setMessages([])
+          setInputMessage("")
+          setIsRecording(false)
+          setIsProcessing(false)
+          setIsSpeaking(false)
+          setAudioChunks([])
+          setCurrentAudio(null)
+          setPendingAudioUrl(null)
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          setUserId(session.user.id)
+        }
+      })
+
+      return () => subscription.unsubscribe()
+    }
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
   useEffect(() => {
-    // Add welcome message
-    if (messages.length === 0) {
+    // Add welcome message only for authenticated users
+    if (messages.length === 0 && userId) {
       const welcomeMessage: Message = {
         id: "welcome",
         type: "assistant",
@@ -167,12 +204,6 @@ export default function VoiceChat({ fileId, fileName, documentText, documentName
     if (!message.trim()) return
 
     try {
-      // Check if this is a search query
-      if (isSearchMode || message.toLowerCase().includes('search') || message.toLowerCase().includes('find')) {
-        await performSearch(message)
-        return
-      }
-
       const openaiKey = localStorage.getItem("voiceloop_openai_key")
       if (!openaiKey) {
         throw new Error("OpenAI API key not configured")
@@ -275,182 +306,6 @@ export default function VoiceChat({ fileId, fileName, documentText, documentName
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
-    }
-  }
-
-  const performSearch = async (query: string) => {
-    try {
-      // Add user message
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        type: "user",
-        content: query,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, userMessage])
-      setInputMessage("")
-      setIsProcessing(true)
-
-      // Check if we're in guest mode (no Supabase configured)
-      let isGuestMode = false
-      try {
-        const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
-        const supabase = getSupabaseBrowser()
-        if (!supabase) {
-          isGuestMode = true
-        }
-      } catch {
-        isGuestMode = true
-      }
-
-      if (isGuestMode) {
-        // Handle guest mode search on client side
-        await handleGuestModeSearch(query)
-        return
-      }
-
-      // Include userId if signed in
-      let userId: string | undefined
-      try {
-        const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
-        const supabase = getSupabaseBrowser()
-        if (supabase) {
-          const { data: { user } } = await supabase.auth.getUser()
-          userId = user?.id
-        }
-      } catch {}
-
-      const response = await fetch("/api/search/semantic", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ query, userId }),
-      })
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => '')
-        let err: any = {}
-        try { err = JSON.parse(text) } catch {}
-        console.error('Search failed:', err || text)
-        throw new Error(err?.error || text || "Search failed")
-      }
-
-      const data = await response.json()
-      const searchResults = data.results || []
-
-      const searchMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "assistant",
-        content: searchResults.length > 0 
-          ? `Found ${searchResults.length} results for "${query}":` 
-          : `No results found for "${query}". Try different keywords or upload more documents.`,
-        timestamp: new Date(),
-        isSearchResult: true,
-        searchResults: searchResults
-      }
-
-      setMessages((prev) => [...prev, searchMessage])
-
-    } catch (error) {
-      console.error("Search error:", error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "assistant",
-        content: error instanceof Error 
-          ? `Search Error: ${error.message}` 
-          : "Sorry, I encountered an error while searching. Please try again.",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
-  const handleGuestModeSearch = async (query: string) => {
-    try {
-      // Get chunks from localStorage
-      const storedChunks = JSON.parse(localStorage.getItem('voiceloop_guest_chunks') || '[]')
-      
-      if (storedChunks.length === 0) {
-        const noResultsMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          type: "assistant",
-          content: `No documents found to search. Please upload some documents first.`,
-          timestamp: new Date(),
-          isSearchResult: true,
-          searchResults: []
-        }
-        setMessages((prev) => [...prev, noResultsMessage])
-        return
-      }
-
-      // Simple text-based search for guest mode
-      const queryLower = query.toLowerCase()
-      const results: any[] = []
-
-      for (const chunk of storedChunks) {
-        const chunkText = chunk.chunkText || chunk.chunk_text || ''
-        const chunkLower = chunkText.toLowerCase()
-        
-        // Calculate simple relevance score based on text matching
-        let score = 0
-        const words = queryLower.split(' ').filter(word => word.length > 2)
-        
-        for (const word of words) {
-          if (chunkLower.includes(word)) {
-            score += 1
-          }
-        }
-        
-        // Normalize score
-        const relevanceScore = words.length > 0 ? score / words.length : 0
-        
-        if (relevanceScore >= 0.1) { // Lower threshold for guest mode
-          results.push({
-            id: chunk.id,
-            fileName: chunk.fileName || chunk.file_name,
-            title: chunk.fileName || chunk.file_name,
-            snippet: chunkText.substring(0, 200) + '...',
-            relevanceScore: relevanceScore,
-            fileType: 'document',
-            uploadedAt: chunk.createdAt || chunk.created_at,
-            matchedChunks: [chunkText.substring(0, 150) + '...']
-          })
-        }
-      }
-
-      // Sort by relevance and limit results
-      const sortedResults = results
-        .sort((a, b) => b.relevanceScore - a.relevanceScore)
-        .slice(0, 10)
-
-      console.log(`Guest mode search found ${sortedResults.length} results for query: "${query}"`)
-      
-      const searchMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "assistant",
-        content: sortedResults.length > 0 
-          ? `Found ${sortedResults.length} results for "${query}":` 
-          : `No results found for "${query}". Try different keywords or upload more documents.`,
-        timestamp: new Date(),
-        isSearchResult: true,
-        searchResults: sortedResults
-      }
-
-      setMessages((prev) => [...prev, searchMessage])
-    } catch (error) {
-      console.error("Guest mode search error:", error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "assistant",
-        content: "Search failed. Please try again.",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsProcessing(false)
     }
   }
 
@@ -616,31 +471,44 @@ export default function VoiceChat({ fileId, fileName, documentText, documentName
     sendMessage(inputMessage)
   }
 
-  return (
-    <Card className="flex flex-col h-[600px] border-thin">
-      {/* Header */}
-      <div className="p-4 border-b border-thin">
-        <div className="flex items-center justify-between">
+  // Don't render chat interface for unauthenticated users
+  if (!userId) {
+    return (
+      <Card className="flex flex-col h-[400px] border-thin">
+        <div className="p-4 border-b border-thin">
           <div className="flex items-center gap-3">
             <MessageCircle className="h-5 w-5 text-primary" />
             <h3 className="font-light text-lg">Smart Chat</h3>
-            {fileId && (
-              <Badge variant="outline" className="font-light">
-                {fileName}
-              </Badge>
-            )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={isSearchMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setIsSearchMode(!isSearchMode)}
-              className="font-light"
+        </div>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center text-muted-foreground">
+            <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="font-light mb-4">Please sign in to access Smart Chat</p>
+            <Button 
+              onClick={() => window.dispatchEvent(new CustomEvent('showAuthModal'))}
+              className="font-montserrat-light"
             >
-              <Search className="h-4 w-4 mr-2" />
-              {isSearchMode ? "Search Mode" : "Chat Mode"}
+              Sign In to Access Smart Chat
             </Button>
           </div>
+        </div>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="flex flex-col h-[400px] border-thin">
+      {/* Header */}
+      <div className="p-4 border-b border-thin">
+        <div className="flex items-center gap-3">
+          <MessageCircle className="h-5 w-5 text-primary" />
+            <h3 className="font-light text-lg">Smart Chat</h3>
+          {fileId && (
+            <Badge variant="outline" className="font-light">
+              {fileName}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -658,38 +526,7 @@ export default function VoiceChat({ fileId, fileName, documentText, documentName
                 <span className="text-xs opacity-70">{message.timestamp.toLocaleTimeString()}</span>
               </div>
               <p className="text-sm font-light whitespace-pre-wrap">{message.content}</p>
-              
-              {/* Search Results */}
-              {message.isSearchResult && message.searchResults && message.searchResults.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {message.searchResults.slice(0, 3).map((result, index) => (
-                    <div key={index} className="p-2 bg-background/50 rounded border text-xs">
-                      <div className="font-medium text-foreground">{result.title}</div>
-                      <div className="text-muted-foreground mt-1">{result.snippet}</div>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-muted-foreground">
-                          {Math.round(result.relevanceScore * 100)}% match
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                          onClick={() => window.open(`/results/${result.id}`, '_blank')}
-                        >
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {message.searchResults.length > 3 && (
-                    <div className="text-xs text-muted-foreground text-center">
-                      ... and {message.searchResults.length - 3} more results
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {message.type === "assistant" && !message.isSearchResult && (
+              {message.type === "assistant" && (
                 <div className="mt-1 flex items-center justify-end">
                   <Button
                     type="button"
@@ -718,7 +555,7 @@ export default function VoiceChat({ fileId, fileName, documentText, documentName
           <Input
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder={isSearchMode ? "Search across all documents..." : "Type your message or use voice..."}
+            placeholder="Type your message or use voice..."
             className="flex-1 font-light"
             disabled={isProcessing}
           />
@@ -732,9 +569,7 @@ export default function VoiceChat({ fileId, fileName, documentText, documentName
             disabled={isProcessing}
           >
             {isProcessing ? (
-              <div className="h-4 w-4">
-                <SophisticatedLoader size="sm" />
-              </div>
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : isRecording ? (
               <MicOff className="h-4 w-4" />
             ) : (

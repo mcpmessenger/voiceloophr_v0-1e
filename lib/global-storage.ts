@@ -28,3 +28,23 @@ export function getFileFromGlobalStorage(fileId: string) {
   const storage = getGlobalStorage()
   return storage.get(fileId)
 }
+
+export function clearGlobalStorage() {
+  const storage = getGlobalStorage()
+  storage.clear()
+  console.log('🧹 Global storage cleared')
+}
+
+export function clearUserFilesFromGlobalStorage(userId: string) {
+  const storage = getGlobalStorage()
+  let clearedCount = 0
+  
+  for (const [fileId, fileData] of storage.entries()) {
+    if (fileData.userId === userId) {
+      storage.delete(fileId)
+      clearedCount++
+    }
+  }
+  
+  console.log(`🧹 Cleared ${clearedCount} files for user ${userId} from global storage`)
+}

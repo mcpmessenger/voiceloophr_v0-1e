@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Key, Save, Eye, EyeOff, LogIn, LogOut } from "lucide-react"
+import { ArrowLeft, Key, Save, Eye, EyeOff, LogIn, LogOut, Calendar, Cloud, CheckCircle, XCircle } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { AuthModal } from '@/components/auth-modal'
@@ -22,6 +22,11 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
+  const [serviceStatus, setServiceStatus] = useState({
+    google: false,
+    microsoft: false,
+    calendar: false
+  })
 
   useEffect(() => {
     // Load saved keys from localStorage
@@ -43,7 +48,22 @@ export default function SettingsPage() {
         setUserId(user?.id ?? null)
       } catch {}
     }
+    
+    // Load service connection status
+    const loadServiceStatus = () => {
+      const googleConnected = !!localStorage.getItem('google_drive_tokens')
+      const microsoftConnected = !!localStorage.getItem('microsoft_calendar_tokens')
+      const calendarConnected = !!localStorage.getItem('google_calendar_tokens')
+      
+      setServiceStatus({
+        google: googleConnected,
+        microsoft: microsoftConnected,
+        calendar: calendarConnected
+      })
+    }
+    
     loadUser()
+    loadServiceStatus()
   }, [])
 
   const handleSave = () => {
@@ -104,6 +124,61 @@ export default function SettingsPage() {
     }
   }
 
+  const handleServiceSignOut = (service: string) => {
+    switch (service) {
+      case 'google':
+        localStorage.removeItem('google_drive_tokens')
+        break
+      case 'microsoft':
+        localStorage.removeItem('microsoft_calendar_tokens')
+        break
+      case 'calendar':
+        localStorage.removeItem('google_calendar_tokens')
+        break
+    }
+    setServiceStatus(prev => ({ ...prev, [service]: false }))
+  }
+
+  const handleGoogleCalendarAuth = async () => {
+    try {
+      const response = await fetch('/api/calendar/auth/google', { method: 'POST' })
+      const data = await response.json()
+      if (data?.authUrl) {
+        window.open(data.authUrl, 'google-calendar-auth', 'width=500,height=650')
+        setTimeout(() => {
+          const tokens = localStorage.getItem('google_calendar_tokens')
+          if (tokens) {
+            setServiceStatus(prev => ({ ...prev, calendar: true }))
+          }
+        }, 2000)
+      }
+    } catch (error) {
+      console.error('Google Calendar auth error:', error)
+    }
+  }
+
+  const handleMicrosoftAuth = async () => {
+    try {
+      const response = await fetch('/api/calendar/auth/microsoft', { method: 'POST' })
+      const data = await response.json()
+      if (data?.authUrl) {
+        const popup = window.open(data.authUrl, 'microsoft-auth', 'width=500,height=650')
+        const timer = setInterval(() => {
+          if (popup?.closed) {
+            clearInterval(timer)
+            const tokens = localStorage.getItem('microsoft_calendar_tokens')
+            if (tokens) {
+              setServiceStatus(prev => ({ ...prev, microsoft: true }))
+            }
+          }
+        }, 1000)
+      }
+    } catch (error) {
+      console.error('Microsoft auth error:', error)
+    }
+  }
+
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -120,89 +195,193 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-6">
-            {/* Authentication Section */}
+            {/* Account & Service Connections Section */}
             <Card className="p-6 border-thin">
               <div className="flex items-center gap-3 mb-4">
-                {userId ? <LogOut className="h-5 w-5 text-accent" /> : <LogIn className="h-5 w-5 text-accent" />}
-                <h2 className="text-xl font-montserrat-light">Account</h2>
+                <Cloud className="h-5 w-5 text-accent" />
+                <h2 className="text-xl font-montserrat-light">Account & Service Connections</h2>
               </div>
-              
+              <p className="text-sm text-muted-foreground font-montserrat-light mb-6">
+                Sign in to sync your documents and settings across devices. Connect to external services for enhanced functionality.
+              </p>
+
+              {/* Main Account Status */}
               {userId ? (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground font-montserrat-light">
-                    You are signed in. Your documents and settings are synced across devices.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    className="font-montserrat-light bg-transparent"
-                    onClick={handleSignOut}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground font-montserrat-light">
-                    Sign in to sync your documents and settings across devices.
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                        Signed in - Your documents and settings are synced
+                      </span>
+                    </div>
                     <Button 
                       variant="outline" 
-                      className="font-montserrat-light bg-transparent text-sm"
-                      onClick={() => handleOAuth('google')}
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                      onClick={handleSignOut}
                     >
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Google
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="font-montserrat-light bg-transparent text-sm"
-                      onClick={() => handleOAuth('linkedin_oidc')}
-                    >
-                      <LogIn className="mr-2 h-4 w-4" />
-                      LinkedIn
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="font-montserrat-light bg-transparent text-sm"
-                      onClick={async () => {
-                        try {
-                          const res = await fetch('/api/calendar/auth/microsoft', { method: 'POST' })
-                          const data = await res.json()
-                          if (data?.authUrl) {
-                            const popup = window.open(
-                              data.authUrl,
-                              'microsoft-calendar-auth',
-                              'width=500,height=650,scrollbars=yes,resizable=yes'
-                            )
-                            const timer = setInterval(() => {
-                              if (popup?.closed) {
-                                clearInterval(timer)
-                                const tokens = localStorage.getItem('microsoft_calendar_tokens')
-                                if (tokens) {
-                                  alert('Microsoft connected successfully')
-                                }
-                              }
-                            }, 1000)
-                          }
-                        } catch {}
-                      }}
-                    >
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Microsoft
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="font-montserrat-light bg-transparent text-sm"
-                      onClick={handleEmailMagic}
-                    >
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Magic Link
+                      <LogOut className="mr-1 h-3 w-3" />
+                      Sign Out
                     </Button>
                   </div>
                 </div>
+              ) : (
+                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <LogIn className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        Sign in to sync your documents and settings
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleOAuth('google')}
+                        className="text-blue-600 border-blue-200 hover:border-blue-300"
+                      >
+                        <LogIn className="mr-1 h-3 w-3" />
+                        Google
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleOAuth('linkedin_oidc')}
+                        className="text-blue-600 border-blue-200 hover:border-blue-300"
+                      >
+                        <LogIn className="mr-1 h-3 w-3" />
+                        LinkedIn
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleEmailMagic}
+                        className="text-blue-600 border-blue-200 hover:border-blue-300"
+                      >
+                        <LogIn className="mr-1 h-3 w-3" />
+                        Magic Link
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               )}
+
+              <div className="space-y-4">
+                {/* Google Drive */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Cloud className="h-5 w-5 text-blue-500" />
+                    <div>
+                      <h3 className="font-medium">Google Drive</h3>
+                      <p className="text-sm text-muted-foreground">Access and import documents from Google Drive</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {serviceStatus.google ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-600">Connected</span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleServiceSignOut('google')}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <XCircle className="mr-1 h-3 w-3" />
+                          Disconnect
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleOAuth('google')}
+                      >
+                        <LogIn className="mr-1 h-3 w-3" />
+                        Connect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Google Calendar */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-5 w-5 text-green-500" />
+                    <div>
+                      <h3 className="font-medium">Google Calendar</h3>
+                      <p className="text-sm text-muted-foreground">Schedule meetings and view calendar events</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {serviceStatus.calendar ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-600">Connected</span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleServiceSignOut('calendar')}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <XCircle className="mr-1 h-3 w-3" />
+                          Disconnect
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleGoogleCalendarAuth}
+                      >
+                        <LogIn className="mr-1 h-3 w-3" />
+                        Connect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Microsoft Calendar */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <h3 className="font-medium">Microsoft Calendar</h3>
+                      <p className="text-sm text-muted-foreground">Access Outlook calendar and schedule meetings</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {serviceStatus.microsoft ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-600">Connected</span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleServiceSignOut('microsoft')}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <XCircle className="mr-1 h-3 w-3" />
+                          Disconnect
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleMicrosoftAuth}
+                      >
+                        <LogIn className="mr-1 h-3 w-3" />
+                        Connect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+
+              </div>
             </Card>
 
             {/* API Settings Section */}

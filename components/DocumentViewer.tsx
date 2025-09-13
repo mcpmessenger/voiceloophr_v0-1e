@@ -16,9 +16,9 @@ import {
   MessageCircle,
   Share2,
   Bookmark,
-  Calendar,
   User,
   Hash,
+  Clock,
   RotateCw, 
   ZoomIn, 
   ZoomOut, 
@@ -28,7 +28,7 @@ import {
   Music, 
   Video as VideoIcon
 } from "lucide-react"
-import { CalendarIntegration } from "./calendar-integration"
+// Calendar integration removed
 // Removed modal viewer usage to simplify UX; in-tab viewer is used
 import dynamic from 'next/dynamic'
 
@@ -261,7 +261,7 @@ export function DocumentViewer({
       {/* Document Content Tabs */}
       <Card className="border-2 border-primary/20">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 bg-primary/5 border-b border-primary/20">
+          <TabsList className="grid w-full grid-cols-5 bg-primary/5 border-b border-primary/20">
             <TabsTrigger value="summary" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="mr-2 h-4 w-4" />
               Summary
@@ -279,10 +279,6 @@ export function DocumentViewer({
             <TabsTrigger value="viewer" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="mr-2 h-4 w-4" />
               Document Viewer
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Calendar className="mr-2 h-4 w-4" />
-              Calendar
             </TabsTrigger>
             <TabsTrigger value="metadata" className="font-light data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Search className="mr-2 h-4 w-4" />
@@ -437,14 +433,7 @@ export function DocumentViewer({
             </div>
           </TabsContent>
 
-          {/* Calendar Tab */}
-          <TabsContent value="calendar" className="p-6">
-            <CalendarIntegration 
-              documentId={document.id}
-              documentTitle={document.name}
-              documentContent={document.extractedText}
-            />
-          </TabsContent>
+          {/* Calendar Tab - REMOVED */}
 
           {/* Metadata Tab */}
           <TabsContent value="metadata" className="p-6">
@@ -475,7 +464,7 @@ export function DocumentViewer({
               
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Processed:</span>
                   <span className="font-medium text-foreground">{formatDate(document.processedAt)}</span>
                 </div>
