@@ -3,16 +3,15 @@ frontend:
   phases:
     preBuild:
       commands:
-        # Install pnpm globally
+        - echo "Installing pnpm globally..."
         - npm install -g pnpm@latest
-        # Install dependencies
+        - echo "Installing dependencies with pnpm..."
         - pnpm install --frozen-lockfile
     build:
       commands:
-        # Build the application
+        - echo "Building application with pnpm..."
         - pnpm build
   artifacts:
-    # Important: Next.js builds to .next folder for static export
     baseDirectory: .next
     files:
       - '**/*'
