@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { LayoutDashboard, Settings } from "lucide-react"
+import { LayoutDashboard, Settings, Calendar } from "lucide-react"
 import { useEffect, useMemo, useState } from 'react'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -81,7 +81,6 @@ export function Navigation({
                 </Link>
               </Button>
             )}
-            
             
             <ThemeToggle />
             

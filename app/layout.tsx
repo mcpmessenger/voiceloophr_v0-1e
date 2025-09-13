@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import { JetBrains_Mono } from "next/font/google"
 import { Montserrat } from "next/font/google"
@@ -50,7 +50,6 @@ export const metadata: Metadata = {
     'ElevenLabs'
   ],
   authors: [{ name: 'VoiceLoop' }],
-  viewport: { width: 'device-width', initialScale: 1, maximumScale: 1 },
   robots: { index: true, follow: true },
   openGraph: {
     title: 'VoiceLoop HR – AI Document Processing, Voice Chat, Calendar & Search',
@@ -86,6 +85,12 @@ export const metadata: Metadata = {
       { url: "https://automationalien.s3.us-east-1.amazonaws.com/voiceloop+white+bkg.png", media: "(prefers-color-scheme: light)" },
     ],
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({

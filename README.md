@@ -478,3 +478,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 *Transforming document analysis with the power of AI*
 
 <!-- build: trigger vercel deploy -->
+<!-- AWS_AMPLIFY_DEPLOY_FLAG: 2025-01-13T01:50:00Z -->

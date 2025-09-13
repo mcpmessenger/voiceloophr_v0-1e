@@ -175,7 +175,7 @@ export function UnifiedSaveButton({
                 ? 'bg-green-600 hover:bg-green-700' 
                 : saveStatus === 'error'
                 ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-gray-600 hover:bg-gray-700'
             }`}
           >
             {getStatusIcon()}

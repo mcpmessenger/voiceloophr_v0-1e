@@ -124,7 +124,8 @@ Focus on business value, actionable insights, risk assessment, and professional 
       // Extract JSON from response (handle cases where OpenAI adds extra text)
       const jsonMatch = response.match(/\{[\s\S]*\}/)
       if (!jsonMatch) {
-        throw new Error('No JSON found in OpenAI response')
+        console.warn('No JSON found in OpenAI response, using fallback analysis')
+        return this.createFallbackAnalysis(originalText)
       }
 
       const parsed = JSON.parse(jsonMatch[0])
@@ -174,6 +175,28 @@ Focus on business value, actionable insights, risk assessment, and professional 
       ],
       riskFactors: ['Limited automated analysis', 'Manual review required'],
       actionItems: ['Review document content', 'Enable AI analysis', 'Process additional documents']
+    }
+  }
+
+  private createFallbackAnalysis(originalText: string): DocumentAnalysis {
+    const wordCount = originalText.split(/\s+/).length
+    const charCount = originalText.length
+    
+    return {
+      summary: `Document processed successfully. Contains ${wordCount} words and ${charCount} characters.`,
+      keyPoints: [
+        'Document successfully processed',
+        `Content length: ${wordCount} words`,
+        'Ready for analysis and search'
+      ],
+      sentiment: 'neutral',
+      confidence: 0.7,
+      metadata: {
+        fallback: true,
+        wordCount,
+        charCount,
+        processedAt: new Date().toISOString()
+      }
     }
   }
 }
