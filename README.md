@@ -50,9 +50,10 @@ VoiceLoop HR is a cutting-edge document analysis platform that combines AI-power
 - **Dark/Light Mode** - System preference detection with manual toggle
 - **Montserrat Font** - Clean, modern typography throughout
 - **Context-Aware Navigation** - Smart button visibility based on current page
-- **Streamlined Interface** - Clean, uncluttered design
+- **Streamlined Interface** - Clean, uncluttered design with minimal redundant elements
 - **Real-time Feedback** - Loading states and progress indicators
 - **Identity Indicator** - Shows the signed-in user's avatar/email in the navbar for clarity
+- **Simplified Dashboard** - Reduced visual clutter with focused primary actions
 
 ## 🛠️ Technology Stack
 
@@ -444,6 +445,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Email** - support@voiceloophr.com
 
 ## 🔄 Changelog
+
+### **v0.1.2** - Dashboard Interface Streamlining
+- ✅ Removed redundant upload buttons from Recent Documents section
+- ✅ Simplified dashboard layout for both authenticated and guest users
+- ✅ Cleaner Recent Documents header without cluttered action buttons
+- ✅ Maintained primary upload functionality through main navigation
+- ✅ Improved visual hierarchy and user focus
 
 ### **v0.1.1** - UI/UX Improvements
 - ✅ Context-aware navigation (removes redundant buttons)
