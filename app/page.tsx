@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { AuthModal } from '@/components/auth-modal'
 import LogoShowcase from '@/components/logo-showcase'
 import { Navigation } from '@/components/navigation'
+import { Footer } from '@/components/footer'
 
 export default function HomePage() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -139,13 +140,7 @@ export default function HomePage() {
 
 
       {/* Footer */}
-      <footer className="border-t border-thin border-border/50 py-8 px-6">
-        <div className="container mx-auto text-center">
-          <p className="text-sm text-muted-foreground font-montserrat-light">
-            © 2025 VoiceLoop. Transform documents into conversations.
-          </p>
-        </div>
-      </footer>
+      <Footer />
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>

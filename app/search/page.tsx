@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import SearchInterface from "@/components/search-interface"
 import { Navigation } from "@/components/navigation"
+import { Footer } from "@/components/footer"
 
 export default function SearchPage() {
   return (
@@ -24,6 +25,9 @@ export default function SearchPage() {
           <SearchInterface />
         </div>
       </section>
+
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Key, Save, Eye, EyeOff, LogIn, LogOut, Calendar, Cloud, CheckCircle, XCircle } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import { Footer } from "@/components/footer"
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { AuthModal } from '@/components/auth-modal'
 
@@ -563,6 +564,9 @@ export default function SettingsPage() {
       </section>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }
