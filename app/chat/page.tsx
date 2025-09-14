@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import VoiceChat from "@/components/voice-chat"
 import { Navigation } from "@/components/navigation"
+import { Footer } from "@/components/footer"
 
 export default function ChatPage() {
   return (
@@ -24,6 +25,9 @@ export default function ChatPage() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }

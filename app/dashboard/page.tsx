@@ -34,6 +34,7 @@ import PlaceholderCalendar from "@/components/placeholder-calendar"
 import PlaceholderDocuments from "@/components/placeholder-documents"
 import VoiceChat from "@/components/voice-chat"
 import { AuthModal } from "@/components/auth-modal"
+import { Footer } from "@/components/footer"
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 
 interface Document {
@@ -100,7 +101,7 @@ export default function DashboardPage() {
     // Listen for auth state changes
     const supabase = getSupabaseBrowser()
     if (supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data: { subscription } } = supabase!.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_OUT') {
           setUserId(null)
           setDocuments([])
@@ -682,6 +683,9 @@ export default function DashboardPage() {
 
       {/* Auth Modal */}
       <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }
